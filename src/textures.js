@@ -365,3 +365,35 @@ export function artPrint(index) {
     }
   });
 }
+
+export function poster() {
+  return make(420, 575, (g, w, h) => {
+    g.fillStyle = '#f3e7d6';
+    g.fillRect(0, 0, w, h);
+    const sky = g.createLinearGradient(0, 60, 0, 330);
+    sky.addColorStop(0, '#9a8fb8');
+    sky.addColorStop(0.6, '#e58f76');
+    sky.addColorStop(1, '#f2c48a');
+    g.fillStyle = sky;
+    g.beginPath();
+    g.roundRect(50, 50, 320, 300, [160, 160, 0, 0]);
+    g.fill();
+    g.fillStyle = '#fff3d6';
+    g.beginPath();
+    g.arc(210, 262, 52, Math.PI, 0);
+    g.fill();
+    g.fillStyle = '#5f8f8c';
+    g.fillRect(50, 262, 320, 88);
+    g.fillStyle = '#f3e7d6';
+    for (let i = 0; i < 4; i++) g.fillRect(150 - i * 22, 280 + i * 18, 120 + i * 44, 4);
+    g.fillStyle = '#3a3448';
+    g.textAlign = 'center';
+    g.font = '700 46px Georgia, serif';
+    g.fillText('MAKE THINGS', 210, 430);
+    g.font = '20px "Segoe UI", system-ui, sans-serif';
+    g.fillStyle = '#8a7a6e';
+    g.fillText('S L O W L Y  ·  C A R E F U L L Y', 210, 474);
+    g.fillStyle = '#e58f76';
+    g.fillRect(180, 505, 60, 5);
+  });
+}

@@ -28,6 +28,7 @@ const C = {
   leaf: '#6f9a7c',
   leafDark: '#557f68',
   terracotta: '#c98263',
+  ceiling: '#f4e8da',
 };
 
 const materials = new Map();
@@ -127,14 +128,82 @@ function buildShell(scene) {
   box(scene, 0.3, 3.8, 1.1, C.wallLeft, -4.15, 1.9, -3.45);
   box(scene, 0.05, 0.16, 8, C.trim, -3.975, 0.08, 0);
 
-  // Invisible ceiling: lets the sun in through the window only.
-  const ceiling = new THREE.Mesh(
-    new THREE.BoxGeometry(9, 0.1, 9),
-    new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
+  // Right wall (+x) and front wall (+z) close the room, and a ceiling tops it.
+  box(scene, 0.3, 3.8, 8.6, C.wallLeft, 4.15, 1.9, 0);
+  box(scene, 8.6, 3.8, 0.3, C.wallBack, 0, 1.9, 4.15);
+  box(scene, 0.05, 0.16, 8, C.trim, 3.975, 0.08, 0);
+  box(scene, 8, 0.16, 0.05, C.trim, 0, 0.08, 3.975);
+  const ceiling = new THREE.MeshStandardMaterial({ color: C.ceiling, emissive: '#c9a890', emissiveIntensity: 0.4, roughness: 1 });
+  box(scene, 8.6, 0.2, 8.6, ceiling, 0, 3.9, 0);
+}
+
+function buildFarSide(scene) {
+  // Door on the right wall.
+  box(scene, 0.08, 2.25, 0.1, C.trim, 3.97, 1.125, 0.33);
+  box(scene, 0.08, 2.25, 0.1, C.trim, 3.97, 1.125, 1.47);
+  box(scene, 0.08, 0.1, 1.24, C.trim, 3.97, 2.3, 0.9);
+  box(scene, 0.05, 2.25, 1.04, C.sage, 3.985, 1.125, 0.9);
+  box(scene, 0.02, 0.85, 0.72, '#9bb3ab', 3.955, 1.6, 0.9);
+  box(scene, 0.02, 0.75, 0.72, '#9bb3ab', 3.955, 0.62, 0.9);
+  add(scene, new THREE.SphereGeometry(0.04, 10, 8), C.mustard, 3.92, 1.08, 0.5);
+
+  // Coat hooks with a tote bag.
+  box(scene, 0.04, 0.1, 0.95, C.woodDark, 3.975, 1.9, -0.5);
+  [-0.82, -0.5, -0.18].forEach((z) => {
+    cyl(scene, 0.018, 0.018, 0.1, C.woodLight, 3.92, 1.9, z, 6).rotation.z = Math.PI / 2;
+  });
+  box(scene, 0.08, 0.46, 0.38, C.mustard, 3.9, 1.5, -0.82);
+  box(scene, 0.02, 0.2, 0.03, C.mustard, 3.91, 1.8, -0.95);
+  box(scene, 0.02, 0.2, 0.03, C.mustard, 3.91, 1.8, -0.69);
+
+  // Large poster between the desk and the door.
+  const p = group(scene, 3.975, 2.1, -2.05, -Math.PI / 2);
+  box(p, 0.95, 1.27, 0.05, C.ink, 0, 0, 0);
+  printed(p, 0.84, 1.15, tex.poster(), 0, 0, 0.027, true);
+
+  // Dresser on the front wall, with a round mirror above it.
+  const d = group(scene, -1.0, 0, 3.7);
+  box(d, 1.8, 0.78, 0.5, C.woodLight, 0, 0.53, 0);
+  for (let col = 0; col < 2; col++) {
+    for (let row = 0; row < 3; row++) {
+      const x = -0.44 + col * 0.88;
+      const y = 0.28 + row * 0.25;
+      box(d, 0.82, 0.21, 0.02, C.cream, x, y, -0.255);
+      box(d, 0.14, 0.022, 0.03, C.woodDark, x, y, -0.27);
+    }
+  }
+  [[-0.8, -0.18], [0.8, -0.18], [-0.8, 0.18], [0.8, 0.18]].forEach(([x, z]) =>
+    cyl(d, 0.03, 0.025, 0.14, C.woodDark, x, 0.07, z, 8)
   );
-  ceiling.position.set(-0.15, 3.9, -0.15);
-  ceiling.castShadow = true;
-  scene.add(ceiling);
+  cyl(d, 0.09, 0.1, 0.03, C.lavender, -0.6, 0.935, 0, 12);
+  cyl(d, 0.015, 0.015, 0.3, C.lavender, -0.6, 1.08, 0, 6);
+  cyl(d, 0.1, 0.17, 0.2, glow('#ffd9a3', 0.9), -0.6, 1.3, 0, 12).castShadow = false;
+  box(d, 0.3, 0.05, 0.22, C.blush, 0.1, 0.945, 0.02).rotation.y = 0.2;
+  box(d, 0.27, 0.045, 0.2, C.teal, 0.1, 0.992, 0.02);
+  bush(d, 0.6, 0.92, 0, 1.4, C.cream);
+  const mirror = cyl(scene, 0.52, 0.52, 0.04, C.mustard, -1.0, 2.05, 3.97, 28);
+  mirror.rotation.x = Math.PI / 2;
+  const glass = new THREE.MeshStandardMaterial({ color: '#e3ecec', roughness: 0.25, emissive: '#55606a', emissiveIntensity: 0.25 });
+  cyl(scene, 0.46, 0.46, 0.02, glass, -1.0, 2.05, 3.945, 28).rotation.x = Math.PI / 2;
+  const dresserLamp = new THREE.PointLight('#ffc58a', 2.2, 5, 2);
+  dresserLamp.position.set(-1.6, 1.45, 3.4);
+  scene.add(dresserLamp);
+
+  // Wall shelf and a pouf.
+  box(scene, 1.3, 0.05, 0.26, C.wood, 1.7, 1.95, 3.86);
+  bush(scene, 1.25, 1.975, 3.86, 1.3);
+  box(scene, 0.06, 0.3, 0.2, C.teal, 1.62, 2.125, 3.86);
+  box(scene, 0.06, 0.26, 0.2, C.blush, 1.69, 2.105, 3.86);
+  box(scene, 0.06, 0.32, 0.2, C.cream, 1.76, 2.135, 3.86);
+  bush(scene, 2.15, 1.975, 3.86, 1.0, C.cream);
+  cyl(scene, 0.36, 0.4, 0.36, C.blush, 1.5, 0.18, 3.3, 14);
+
+  // Pendant light over the rug.
+  cyl(scene, 0.008, 0.008, 0.75, C.ink, -0.5, 3.43, 0.1, 5).castShadow = false;
+  cyl(scene, 0.1, 0.3, 0.26, glow('#ffdcae', 0.8), -0.5, 2.95, 0.1, 16).castShadow = false;
+  const pendant = new THREE.PointLight('#ffcf9a', 7, 9, 2);
+  pendant.position.set(-0.5, 2.7, 0.1);
+  scene.add(pendant);
 }
 
 function buildWindow(scene) {
@@ -436,7 +505,7 @@ function buildDust(scene) {
 }
 
 function buildLights(scene) {
-  scene.add(new THREE.HemisphereLight('#ffe3cc', '#6a5578', 1.15));
+  scene.add(new THREE.HemisphereLight('#ffe3cc', '#a48a86', 1.15));
 
   const sun = new THREE.DirectionalLight('#ffab6b', 4.2);
   sun.position.set(-12, 7.2, -5.3);
@@ -456,6 +525,9 @@ function buildLights(scene) {
   const fill = new THREE.DirectionalLight('#f3dcf0', 1.25);
   fill.position.set(6, 9, 8);
   scene.add(fill);
+  const fillBack = new THREE.DirectionalLight('#ffe0cc', 0.9);
+  fillBack.position.set(-6, 7, -8);
+  scene.add(fillBack);
 }
 
 function buildHitboxes(scene) {
@@ -475,26 +547,31 @@ function buildHitboxes(scene) {
   ];
 }
 
-// Where the camera goes for each station, and where its label floats.
+// Where you stand and what you look at for each station, and where its label floats.
+export const home = {
+  pos: new THREE.Vector3(2.9, 1.7, 3.0),
+  target: new THREE.Vector3(-0.6, 1.3, -1.8),
+};
+
 export const views = {
   desk: {
-    pos: new THREE.Vector3(2.15, 2.1, 0.7),
+    pos: new THREE.Vector3(2.1, 1.72, -1.2),
     target: new THREE.Vector3(2.05, 1.38, -3.7),
     anchor: new THREE.Vector3(1.2, 2.12, -3.7),
   },
   photos: {
-    pos: new THREE.Vector3(2.2, 2.8, 0.9),
-    target: new THREE.Vector3(2.2, 2.86, -4),
+    pos: new THREE.Vector3(2.2, 1.7, -1.5),
+    target: new THREE.Vector3(2.2, 2.92, -3.97),
     anchor: new THREE.Vector3(2.65, 3.42, -3.9),
   },
   shelf: {
-    pos: new THREE.Vector3(-2.2, 1.6, 1.5),
-    target: new THREE.Vector3(-2.2, 1.38, -4),
-    anchor: new THREE.Vector3(-2.9, 3.1, -3.7),
+    pos: new THREE.Vector3(-2.2, 1.6, -0.85),
+    target: new THREE.Vector3(-2.2, 1.4, -4),
+    anchor: new THREE.Vector3(-2.9, 3.0, -3.6),
   },
   frame: {
-    pos: new THREE.Vector3(-0.7, 2.0, 0.85),
-    target: new THREE.Vector3(-4, 1.95, 0.85),
+    pos: new THREE.Vector3(-2.1, 1.75, 0.85),
+    target: new THREE.Vector3(-4, 2.0, 0.85),
     anchor: new THREE.Vector3(-3.9, 2.72, 1.4),
   },
 };
@@ -502,6 +579,7 @@ export const views = {
 export function buildRoom(scene, stations, profile) {
   buildShell(scene);
   const windowMaterial = buildWindow(scene);
+  buildFarSide(scene);
   buildSofa(scene);
   buildLounge(scene);
   buildSideboard(scene, stations.frame, profile);

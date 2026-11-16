@@ -1,6 +1,6 @@
 # 3D Room Portfolio
 
-A personal website presented as a cozy, low-poly 3D room. Each corner holds an object that stands for a social profile or a piece of information about me. Clicking an object flies the camera to it, and the object and its info card show the content and the link.
+A personal website presented as a cozy, low-poly 3D room, seen from inside as if you were standing in it. Drag to look around. Each corner holds an object that stands for a social profile or a piece of information about me. Clicking an object walks you over to it, and the object and its info card show the content and the link.
 
 ## What is in the room
 
