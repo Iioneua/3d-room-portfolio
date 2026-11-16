@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import './style.css';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildRoom, views, home } from './room.js';
+import { buildOutside } from './outside.js';
 import { createAmbience } from './audio.js';
 import { profile, stations } from './content.js';
 
@@ -13,21 +20,89 @@ const MAX_PITCH = 0.7;
 // How far you can turn your head from where you are facing (radians).
 const TURN_HOME = 0.9;
 const TURN_FOCUS = 0.8;
+// Camera exposure: lower is darker. The sky outside is far brighter than the room.
+const EXPOSURE = 0.62;
 
 // ---------- Scene ----------
+// ?quality=high or ?quality=low fixes the quality; otherwise it adapts to the computer.
+const fixedQuality = params.get('quality');
+let pixelRatio = Math.min(window.devicePixelRatio, fixedQuality === 'low' ? 1 : 1.5);
+
 const canvas = $('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(pixelRatio);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+// Nothing that casts a shadow ever moves, so the shadows are drawn once.
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = EXPOSURE;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#2b2647');
-const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 60);
+const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 6000);
 camera.rotation.order = 'YXZ';
 const room = buildRoom(scene, stations, profile);
+const outside = buildOutside(scene, room.root);
+
+// Photograph the lit room from its centre and use that picture as ambient light.
+// It gives every surface soft bounced light and reflections that match the room.
+const pmrem = new THREE.PMREMGenerator(renderer);
+const baked = pmrem.fromScene(scene, 0.02, 0.05, 6000, { position: new THREE.Vector3(-0.4, 1.7, 0.4) });
+scene.environment = baked.texture;
+scene.environmentIntensity = 1.0;
+room.bounce.intensity = 0.2;
+pmrem.dispose();
+
+// ---------- Camera effects ----------
+const composer = new EffectComposer(
+  renderer,
+  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 })
+);
+composer.addPass(new RenderPass(scene, camera));
+
+// Contact shadows where surfaces meet (corners, under furniture, between books).
+const occlusion = new GTAOPass(scene, camera, 1, 1);
+occlusion.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.5, thickness: 1.2, scale: 1.2, samples: 12 });
+const drawOcclusion = occlusion.render.bind(occlusion);
+const skipOcclusion = [...room.noAO, outside.sky, outside.water];
+occlusion.render = (...args) => {
+  for (const o of skipOcclusion) o.visible = false;
+  drawOcclusion(...args);
+  for (const o of skipOcclusion) o.visible = true;
+};
+occlusion.enabled = fixedQuality !== 'low';
+composer.addPass(occlusion);
+
+// Glow around the sun, lamps and screens.
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.7, 1.3));
+composer.addPass(new OutputPass());
+
+// Slight darkening towards the corners and a touch of film grain.
+const finish = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec2 d = (vUv - 0.5) * vec2(1.0, 0.85);
+      c.rgb *= mix(0.72, 1.0, smoothstep(0.78, 0.22, length(d)));
+      c.rgb += (hash(vUv * 900.0 + fract(uTime) * 37.0) - 0.5) * 0.016;
+      gl_FragColor = c;
+    }
+  `,
+});
+composer.addPass(finish);
 
 // ---------- First-person rig ----------
 // You stand at `pos` and look along `yaw` (left/right) and `pitch` (up/down).
@@ -76,7 +151,10 @@ const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
+  renderer.setPixelRatio(pixelRatio);
   renderer.setSize(w, h, false);
+  composer.setPixelRatio(pixelRatio);
+  composer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -289,10 +367,36 @@ function frame() {
   camera.translateX(sway.x * 0.05);
   camera.translateY(sway.y * 0.03);
 
-  room.update(time, camera);
-  renderer.render(scene, camera);
+  room.update(time);
+  outside.update(time);
+  finish.uniforms.uTime.value = time;
+  composer.render();
   placeLabels();
+  watchSpeed();
   requestAnimationFrame(frame);
+}
+
+// If the computer struggles, trade some sharpness and the contact shadows for speed.
+const speed = { since: 0, frames: 0, last: 0, step: 0 };
+function watchSpeed() {
+  if (fixedQuality || speed.step >= 2 || document.body.classList.contains('intro')) return;
+  const now = performance.now();
+  if (now - speed.last > 400) {
+    // The tab was in the background or just started: begin a fresh measurement.
+    speed.since = now;
+    speed.frames = 0;
+  }
+  speed.last = now;
+  speed.frames++;
+  if (now - speed.since < 3000) return;
+  const fps = (speed.frames * 1000) / (now - speed.since);
+  speed.since = now;
+  speed.frames = 0;
+  if (fps >= 30) return;
+  speed.step++;
+  if (speed.step === 1) pixelRatio = 1;
+  else occlusion.enabled = false;
+  resize();
 }
 
 resize();
