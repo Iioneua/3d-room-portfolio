@@ -7,10 +7,12 @@ export const profile = {
   tagline: 'Step inside. Every corner of this room says something about me.',
 };
 
+// `where` is the short line above each card's title, naming the object you are looking at.
 export const stations = {
   desk: {
     label: 'Projects',
     kicker: 'GitHub',
+    where: 'On the desk · Ultrawide monitor',
     title: 'Things I build',
     body: 'Placeholder text. I design and build small, polished things for the web, from interfaces to the code behind them.',
     items: [
@@ -25,6 +27,7 @@ export const stations = {
   frame: {
     label: 'Experience',
     kicker: 'LinkedIn',
+    where: 'On the wall · Framed plaque',
     title: 'Where I have worked',
     body: 'Placeholder text. A short summary of my path so far, the roles I have held and what I am looking for next.',
     items: [
@@ -33,11 +36,12 @@ export const stations = {
       { title: 'BSc Computer Science', text: 'Example University' },
     ],
     link: { label: 'Open LinkedIn', url: 'https://www.linkedin.com/' },
-    objectHint: 'or click the frame',
+    objectHint: 'or click the plaque',
   },
   photos: {
     label: 'Photos',
     kicker: 'Instagram',
+    where: 'On the ledge · Framed photos',
     title: 'Life outside the screen',
     body: 'Placeholder text. Sunsets, coffee, trips and the occasional design sketch. The parts of my week that are not code.',
     items: [
@@ -51,6 +55,7 @@ export const stations = {
   shelf: {
     label: 'About me',
     kicker: 'About',
+    where: 'On the shelves · A few of my things',
     title: 'A few things about me',
     body: 'Placeholder text. I care about calm interfaces, clean code and details that most people only notice when they are missing.',
     items: [
@@ -59,6 +64,6 @@ export const stations = {
       { title: 'Fuelled by', text: 'Coffee and long walks' },
     ],
     link: { label: 'Say hello', url: 'mailto:hello@example.com' },
-    objectHint: 'or click the bookshelf',
+    objectHint: 'or click the shelves',
   },
 };

@@ -1,20 +1,30 @@
 import * as THREE from 'three';
 
-// Everything that appears "printed" on an object (screens, the framed page,
-// the photos) is drawn here on a canvas, from the data in content.js.
+// Everything that appears printed or displayed on an object (screens, the plaque,
+// prints) is drawn here on a canvas, from the data in content.js.
 
-const FONT = '"Segoe UI", system-ui, sans-serif';
+const SANS = '"Inter", "Segoe UI", system-ui, sans-serif';
+const MONO = '"Cascadia Code", Consolas, "Courier New", monospace';
+const SERIF = '"Instrument Serif", Georgia, serif';
 
-function make(w, h, draw) {
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const g = canvas.getContext('2d');
-  draw(g, w, h);
-  const texture = new THREE.CanvasTexture(canvas);
+function canvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function toTexture(c) {
+  const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
   return texture;
+}
+
+function make(w, h, draw) {
+  const c = canvas(w, h);
+  draw(c.getContext('2d'), w, h);
+  return toTexture(c);
 }
 
 function rng(seed) {
@@ -41,198 +51,309 @@ function fit(g, text, maxWidth) {
 
 const shortUrl = (url) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/^mailto:/, '').replace(/\/$/, '');
 
-export function codeScreen(station, profile) {
-  return make(1024, 560, (g, w, h) => {
-    g.fillStyle = '#1d1a2b';
-    g.fillRect(0, 0, w, h);
-    g.fillStyle = '#151322';
-    g.fillRect(0, 0, w, 46);
-    ['#e8806f', '#e9b96a', '#7fb7a4'].forEach((c, i) => {
-      g.fillStyle = c;
-      g.beginPath();
-      g.arc(26 + i * 24, 23, 7, 0, Math.PI * 2);
-      g.fill();
-    });
-    g.fillStyle = '#2a2640';
-    rounded(g, 300, 9, 424, 28, 14);
-    g.fill();
-    g.fillStyle = '#a9a3c2';
-    g.font = `16px ${FONT}`;
-    g.textAlign = 'center';
-    g.fillText(shortUrl(station.link.url), 512, 29);
-    g.textAlign = 'left';
-
-    // Profile column.
-    const grad = g.createLinearGradient(50, 80, 150, 180);
-    grad.addColorStop(0, '#f2b279');
-    grad.addColorStop(1, '#c9708a');
-    g.fillStyle = grad;
+// A dusk landscape like the view from the window, used as the desktop wallpaper.
+function wallpaper(g, w, h) {
+  const sky = g.createLinearGradient(0, 0, 0, h * 0.62);
+  sky.addColorStop(0, '#2b2d5c');
+  sky.addColorStop(0.45, '#7a5f9a');
+  sky.addColorStop(0.8, '#e08fa0');
+  sky.addColorStop(1, '#f7b892');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, w, h * 0.62);
+  const r = rng(4);
+  const ridge = (base, amp, color, seed) => {
+    const rr = rng(seed);
+    g.fillStyle = color;
     g.beginPath();
-    g.arc(100, 130, 50, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#f6eadd';
-    g.font = `600 38px ${FONT}`;
-    g.fillText(fit(g, profile.name, 230), 170, 128);
-    g.fillStyle = '#a9a3c2';
-    g.font = `20px ${FONT}`;
-    g.fillText(fit(g, profile.role, 230), 170, 160);
-
-    g.fillStyle = '#8d87a8';
-    g.font = `16px ${FONT}`;
-    g.fillText('Contributions', 50, 232);
-    const r = rng(7);
-    const greens = ['#2a2640', '#35506a', '#4b8a8a', '#7fc4b0', '#f2b279'];
-    for (let col = 0; col < 17; col++) {
-      for (let row = 0; row < 7; row++) {
-        g.fillStyle = greens[Math.floor(Math.pow(r(), 1.6) * greens.length)];
-        rounded(g, 50 + col * 21, 248 + row * 21, 16, 16, 3);
-        g.fill();
-      }
+    g.moveTo(0, h * 0.62);
+    let y = base;
+    for (let x = 0; x <= w; x += 8) {
+      y += (rr() - 0.5) * amp;
+      y = Math.min(Math.max(y, base - amp * 4), base + amp * 2);
+      g.lineTo(x, h * y);
     }
-    g.fillStyle = '#f2b279';
-    rounded(g, 50, 440, 200, 46, 23);
+    g.lineTo(w, h * 0.62);
     g.fill();
-    g.fillStyle = '#2a1f2e';
-    g.font = `600 19px ${FONT}`;
+  };
+  ridge(0.5, 0.012, '#9a7aa6', 3);
+  ridge(0.55, 0.01, '#6c5687', 8);
+  ridge(0.59, 0.008, '#463a63', 13);
+  const lake = g.createLinearGradient(0, h * 0.62, 0, h);
+  lake.addColorStop(0, '#d69aa4');
+  lake.addColorStop(0.4, '#6d5a8c');
+  lake.addColorStop(1, '#1c1d3a');
+  g.fillStyle = lake;
+  g.fillRect(0, h * 0.62, w, h * 0.38);
+  for (let i = 0; i < 70; i++) {
+    const x = r() * w;
+    g.fillStyle = `rgba(255, 214, 160, ${0.5 + r() * 0.5})`;
+    g.fillRect(x, h * 0.615 - r() * 3, 2, 2);
+    g.fillStyle = 'rgba(255, 200, 150, 0.18)';
+    g.fillRect(x, h * 0.63, 2, 10 + r() * 20);
+  }
+}
+
+function windowFrame(g, x, y, w, h, title) {
+  g.fillStyle = 'rgba(22, 20, 32, 0.9)';
+  rounded(g, x, y, w, h, 14);
+  g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.08)';
+  g.lineWidth = 1.5;
+  g.stroke();
+  ['#f0766a', '#f2c25b', '#69c97a'].forEach((c, i) => {
+    g.fillStyle = c;
+    g.beginPath();
+    g.arc(x + 20 + i * 18, y + 18, 5.5, 0, Math.PI * 2);
+    g.fill();
+  });
+  g.fillStyle = 'rgba(235, 228, 245, 0.6)';
+  g.font = `500 15px ${SANS}`;
+  g.textAlign = 'center';
+  g.fillText(title, x + w / 2, y + 23);
+  g.textAlign = 'left';
+}
+
+// The ultrawide monitor: wallpaper, menu bar, clock, a terminal and the project list.
+export function desktopScreen(station, profile) {
+  const W = 2048;
+  const H = 606;
+  const c = canvas(W, H);
+  const g = c.getContext('2d');
+  const base = canvas(W, H);
+  wallpaper(base.getContext('2d'), W, H);
+
+  function draw() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    g.drawImage(base, 0, 0);
+    // Menu bar.
+    g.fillStyle = 'rgba(16, 14, 26, 0.45)';
+    g.fillRect(0, 0, W, 30);
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    g.font = `600 15px ${SANS}`;
+    g.fillText(profile.name, 22, 20);
+    g.font = `15px ${SANS}`;
+    ['File', 'Edit', 'View', 'Go', 'Window'].forEach((t, i) => g.fillText(t, 100 + i * 62, 20));
+    g.textAlign = 'right';
+    g.fillText(`${now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}   ${time}`, W - 22, 20);
     g.textAlign = 'center';
-    g.fillText(station.link.label + '  ↗', 150, 470);
+    // Clock.
+    g.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    g.font = `400 92px ${SERIF}`;
+    g.fillText(time, W / 2, 132);
+    g.font = `500 17px ${SANS}`;
+    g.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    g.fillText(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), W / 2, 160);
     g.textAlign = 'left';
 
-    // Pinned projects.
-    g.fillStyle = '#8d87a8';
-    g.font = `16px ${FONT}`;
-    g.fillText('Pinned', 470, 96);
-    const dots = ['#7fc4b0', '#e9b96a', '#c9708a', '#8fa4e8'];
+    // Terminal.
+    const tx = 560;
+    const ty = 200;
+    windowFrame(g, tx, ty, 430, 300, 'zsh — ~/projects');
+    g.font = `15px ${MONO}`;
+    const lines = [
+      ['#8be3a1', '➜ ', '#e9e4f5', 'git pull'],
+      ['#9b95b8', '', '#9b95b8', 'Already up to date.'],
+      ['#8be3a1', '➜ ', '#e9e4f5', 'npm run dev'],
+      ['#9b95b8', '', '#c7a6ff', '  VITE ready in 249 ms'],
+      ['#9b95b8', '', '#9b95b8', '  ➜ Local: localhost:5173'],
+      ['#8be3a1', '➜ ', '#e9e4f5', 'git commit -m "polish"'],
+      ['#9b95b8', '', '#9b95b8', '[main 9fbba53] polish'],
+      ['#8be3a1', '➜ ', '#e9e4f5', '▍'],
+    ];
+    lines.forEach(([c1, p, c2, t], i) => {
+      g.fillStyle = c1;
+      g.fillText(p, tx + 22, ty + 66 + i * 28);
+      g.fillStyle = c2;
+      g.fillText(t, tx + 22 + g.measureText(p).width, ty + 66 + i * 28);
+    });
+
+    // Projects window.
+    const px = 1030;
+    const py = 200;
+    windowFrame(g, px, py, 460, 300, shortUrl(station.link.url));
+    g.fillStyle = '#f3ecff';
+    g.font = `600 20px ${SANS}`;
+    g.fillText('Pinned projects', px + 24, py + 70);
+    const dots = ['#8be3a1', '#f2c25b', '#f0766a', '#8fa4e8'];
     station.items.slice(0, 4).forEach((item, i) => {
-      const x = 470 + (i % 2) * 262;
-      const y = 114 + Math.floor(i / 2) * 196;
-      g.strokeStyle = '#3a3552';
-      g.lineWidth = 2;
-      rounded(g, x, y, 244, 176, 12);
-      g.stroke();
-      g.fillStyle = '#f2b279';
-      g.font = `600 23px ${FONT}`;
-      g.fillText(fit(g, item.title, 204), x + 20, y + 44);
-      g.fillStyle = '#c9c3dd';
-      g.font = `16px ${FONT}`;
-      g.fillText(fit(g, item.text, 204), x + 20, y + 76);
-      g.fillStyle = '#2a2640';
-      rounded(g, x + 20, y + 96, 204, 8, 4);
-      g.fill();
-      rounded(g, x + 20, y + 112, 140, 8, 4);
+      const y = py + 108 + i * 46;
+      g.fillStyle = 'rgba(255,255,255,0.05)';
+      rounded(g, px + 18, y - 24, 424, 38, 8);
       g.fill();
       g.fillStyle = dots[i % dots.length];
       g.beginPath();
-      g.arc(x + 27, y + 148, 7, 0, Math.PI * 2);
+      g.arc(px + 36, y - 5, 5, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = '#a9a3c2';
-      g.font = `15px ${FONT}`;
-      g.fillText(fit(g, item.tag || '', 180), x + 42, y + 153);
+      g.fillStyle = '#ece6f7';
+      g.font = `600 16px ${SANS}`;
+      g.fillText(fit(g, item.title, 140), px + 52, y);
+      g.fillStyle = '#a49dbd';
+      g.font = `15px ${SANS}`;
+      g.fillText(fit(g, item.text, 220), px + 200, y);
     });
+
+    // Dock.
+    const icons = ['#e9e4f5', '#8be3a1', '#f2c25b', '#8fa4e8', '#f0766a', '#c7a6ff', '#69c9c0'];
+    const dw = icons.length * 46 + 16;
+    g.fillStyle = 'rgba(30, 26, 44, 0.55)';
+    rounded(g, W / 2 - dw / 2, H - 58, dw, 50, 16);
+    g.fill();
+    icons.forEach((col, i) => {
+      g.fillStyle = col;
+      rounded(g, W / 2 - dw / 2 + 12 + i * 46, H - 50, 34, 34, 9);
+      g.fill();
+    });
+  }
+
+  draw();
+  const texture = toTexture(c);
+  let minute = new Date().getMinutes();
+  return {
+    texture,
+    // Redraws the clock when the minute changes.
+    tick() {
+      const m = new Date().getMinutes();
+      if (m === minute) return;
+      minute = m;
+      draw();
+      texture.needsUpdate = true;
+    },
+  };
+}
+
+export function laptopScreen() {
+  return make(640, 420, (g, w, h) => {
+    g.fillStyle = '#16151d';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#211f2b';
+    g.fillRect(0, 0, 150, h);
+    g.font = `13px ${MONO}`;
+    ['src', '  main.js', '  room.js', '  outside.js', '  style.css', 'public', 'index.html'].forEach((t, i) => {
+      g.fillStyle = i === 2 ? '#e9e4f5' : '#8d87a8';
+      g.fillText(t, 16, 30 + i * 22);
+    });
+    const r = rng(9);
+    const palette = ['#c7a6ff', '#8be3a1', '#f2c25b', '#8fa4e8', '#e9e4f5', '#8d87a8'];
+    for (let i = 0; i < 17; i++) {
+      let x = 172 + (i % 4 === 0 ? 0 : 20 + Math.floor(r() * 3) * 20);
+      g.fillStyle = '#4a4560';
+      g.fillText(String(i + 1).padStart(2, ' '), 154, 30 + i * 22);
+      const parts = 1 + Math.floor(r() * 3);
+      for (let k = 0; k < parts; k++) {
+        const len = 30 + r() * 110;
+        g.fillStyle = palette[Math.floor(r() * palette.length)];
+        g.fillRect(x, 21 + i * 22, len, 9);
+        x += len + 10;
+      }
+    }
   });
 }
 
-export function designScreen() {
-  return make(760, 450, (g, w, h) => {
-    g.fillStyle = '#2a2738';
+// The LinkedIn award plaque: a brushed-metal logo and an engraved nameplate.
+export function plaqueLogo() {
+  return make(256, 256, (g, w, h) => {
+    const metal = g.createLinearGradient(0, 0, w, h);
+    metal.addColorStop(0, '#e7e7ea');
+    metal.addColorStop(0.45, '#a9aab0');
+    metal.addColorStop(0.55, '#c9cace');
+    metal.addColorStop(1, '#8c8d93');
+    g.fillStyle = metal;
     g.fillRect(0, 0, w, h);
-    g.fillStyle = '#211e2e';
-    g.fillRect(0, 0, 54, h);
-    g.fillRect(w - 150, 0, 150, h);
-    for (let i = 0; i < 6; i++) {
-      g.fillStyle = i === 1 ? '#f2b279' : '#4a4563';
-      rounded(g, 15, 20 + i * 42, 24, 24, 6);
-      g.fill();
+    for (let y = 0; y < h; y += 2) {
+      g.fillStyle = `rgba(255,255,255,${0.03 + ((y * 7) % 5) * 0.012})`;
+      g.fillRect(0, y, w, 1);
     }
-    // Artboard.
-    g.fillStyle = '#f6eadd';
-    rounded(g, 96, 46, 474, 358, 8);
-    g.fill();
-    g.fillStyle = '#e58f76';
-    g.beginPath();
-    g.arc(226, 176, 78, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#6f9a96';
-    rounded(g, 300, 116, 220, 150, 18);
-    g.fill();
-    g.fillStyle = '#e9b96a';
-    g.beginPath();
-    g.moveTo(330, 350);
-    g.lineTo(430, 210);
-    g.lineTo(530, 350);
-    g.closePath();
-    g.fill();
-    g.fillStyle = '#3a3448';
-    g.font = `700 76px Georgia, serif`;
-    g.fillText('Aa', 130, 360);
-    g.strokeStyle = '#8fa4e8';
-    g.lineWidth = 2;
-    g.strokeRect(296, 112, 228, 158);
-    g.fillStyle = '#8fa4e8';
-    [[296, 112], [524, 112], [296, 270], [524, 270]].forEach(([x, y]) => g.fillRect(x - 5, y - 5, 10, 10));
-    // Palette panel.
-    ['#e58f76', '#e9b96a', '#6f9a96', '#8fa4e8', '#c9708a', '#f6eadd'].forEach((c, i) => {
-      g.fillStyle = c;
-      rounded(g, w - 130 + (i % 3) * 38, 34 + Math.floor(i / 3) * 38, 30, 30, 7);
-      g.fill();
-    });
-    g.fillStyle = '#4a4563';
-    for (let i = 0; i < 7; i++) {
-      rounded(g, w - 130, 140 + i * 30, i % 2 ? 76 : 108, 10, 5);
-      g.fill();
-    }
+    g.fillStyle = '#2a2b30';
+    g.font = `700 150px ${SANS}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('in', w / 2 + 4, h / 2 + 8);
   });
 }
 
-export function framedPage(station, profile) {
-  return make(900, 660, (g, w, h) => {
-    g.fillStyle = '#f8f1e4';
+export function nameplate(profile) {
+  return make(512, 96, (g, w, h) => {
+    const metal = g.createLinearGradient(0, 0, w, 0);
+    metal.addColorStop(0, '#9e9fa5');
+    metal.addColorStop(0.5, '#d4d5d9');
+    metal.addColorStop(1, '#9e9fa5');
+    g.fillStyle = metal;
     g.fillRect(0, 0, w, h);
-    g.strokeStyle = '#c9a66b';
-    g.lineWidth = 4;
-    g.strokeRect(28, 28, w - 56, h - 56);
+    g.fillStyle = '#3a3b40';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `400 40px ${SERIF}`;
+    g.fillText(profile.name, w / 2, h / 2 - 8);
+    g.font = `500 16px ${SANS}`;
+    g.fillText(profile.role.toUpperCase(), w / 2, h / 2 + 24);
+  });
+}
+
+export function globeTexture() {
+  return make(1024, 512, (g, w, h) => {
+    g.fillStyle = '#1d2a44';
+    g.fillRect(0, 0, w, h);
+    const r = rng(21);
+    // Blobby continents from overlapping ellipses.
+    const continents = [
+      [0.18, 0.32, 0.1, 0.12], [0.24, 0.62, 0.05, 0.14], [0.5, 0.3, 0.08, 0.1], [0.53, 0.58, 0.07, 0.15],
+      [0.7, 0.33, 0.16, 0.12], [0.84, 0.7, 0.06, 0.06], [0.42, 0.12, 0.05, 0.04],
+    ];
+    g.fillStyle = '#3a4a62';
+    for (const [cx, cy, rx, ry] of continents) {
+      for (let i = 0; i < 26; i++) {
+        g.beginPath();
+        g.ellipse(
+          (cx + (r() - 0.5) * rx * 1.4) * w,
+          (cy + (r() - 0.5) * ry * 1.4) * h,
+          rx * w * (0.25 + r() * 0.35),
+          ry * h * (0.25 + r() * 0.35),
+          r() * Math.PI,
+          0,
+          Math.PI * 2
+        );
+        g.fill();
+      }
+    }
+    g.strokeStyle = 'rgba(214, 178, 110, 0.55)';
     g.lineWidth = 1.5;
-    g.strokeRect(40, 40, w - 80, h - 80);
-
-    g.fillStyle = '#0a66c2';
-    rounded(g, 76, 78, 76, 76, 12);
-    g.fill();
-    g.fillStyle = '#ffffff';
-    g.font = `700 50px ${FONT}`;
-    g.fillText('in', 94, 136);
-
-    g.fillStyle = '#3a3448';
-    g.font = `700 50px Georgia, serif`;
-    g.fillText(fit(g, profile.name, 640), 180, 116);
-    g.fillStyle = '#8a7a6e';
-    g.font = `26px ${FONT}`;
-    g.fillText(fit(g, profile.role, 640), 180, 152);
-
-    g.strokeStyle = '#dcc9a8';
-    g.lineWidth = 2;
-    g.beginPath();
-    g.moveTo(76, 196);
-    g.lineTo(w - 76, 196);
-    g.stroke();
-
-    station.items.slice(0, 3).forEach((item, i) => {
-      const y = 258 + i * 104;
-      g.fillStyle = '#c9a66b';
+    for (let i = 1; i < 6; i++) {
       g.beginPath();
-      g.arc(92, y - 10, 9, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#3a3448';
-      g.font = `600 32px ${FONT}`;
-      g.fillText(fit(g, item.title, 690), 124, y);
-      g.fillStyle = '#8a7a6e';
-      g.font = `24px ${FONT}`;
-      g.fillText(fit(g, item.text, 690), 124, y + 36);
-    });
+      g.moveTo(0, (i / 6) * h);
+      g.lineTo(w, (i / 6) * h);
+      g.stroke();
+    }
+    for (let i = 0; i < 12; i++) {
+      g.beginPath();
+      g.moveTo((i / 12) * w, 0);
+      g.lineTo((i / 12) * w, h);
+      g.stroke();
+    }
+  });
+}
 
-    g.fillStyle = '#0a66c2';
-    g.font = `600 22px ${FONT}`;
-    g.textAlign = 'right';
-    g.fillText(shortUrl(station.link.url) + '  ↗', w - 76, h - 70);
+// A simple orange print for the frame on the shelf.
+export function orangePrint() {
+  return make(400, 500, (g, w, h) => {
+    g.fillStyle = '#efe7da';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#d9783f';
+    g.fillRect(w * 0.22, h * 0.24, w * 0.56, h * 0.44);
+    g.fillStyle = '#b8552c';
+    g.fillRect(w * 0.22, h * 0.6, w * 0.56, h * 0.08);
+  });
+}
+
+// The face of a small glowing desk light: pink fading into violet.
+export function glowPanel() {
+  return make(64, 256, (g, w, h) => {
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#ffd1f0');
+    grad.addColorStop(0.4, '#ff7fd1');
+    grad.addColorStop(1, '#8a5cff');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
   });
 }
 
@@ -269,37 +390,5 @@ export function artPrint(index) {
       g.lineTo(260, 320);
       g.stroke();
     }
-  });
-}
-
-export function poster() {
-  return make(420, 575, (g, w, h) => {
-    g.fillStyle = '#f3e7d6';
-    g.fillRect(0, 0, w, h);
-    const sky = g.createLinearGradient(0, 60, 0, 330);
-    sky.addColorStop(0, '#9a8fb8');
-    sky.addColorStop(0.6, '#e58f76');
-    sky.addColorStop(1, '#f2c48a');
-    g.fillStyle = sky;
-    g.beginPath();
-    g.roundRect(50, 50, 320, 300, [160, 160, 0, 0]);
-    g.fill();
-    g.fillStyle = '#fff3d6';
-    g.beginPath();
-    g.arc(210, 262, 52, Math.PI, 0);
-    g.fill();
-    g.fillStyle = '#5f8f8c';
-    g.fillRect(50, 262, 320, 88);
-    g.fillStyle = '#f3e7d6';
-    for (let i = 0; i < 4; i++) g.fillRect(150 - i * 22, 280 + i * 18, 120 + i * 44, 4);
-    g.fillStyle = '#3a3448';
-    g.textAlign = 'center';
-    g.font = '700 46px Georgia, serif';
-    g.fillText('MAKE THINGS', 210, 430);
-    g.font = '20px "Segoe UI", system-ui, sans-serif';
-    g.fillStyle = '#8a7a6e';
-    g.fillText('S L O W L Y  ·  C A R E F U L L Y', 210, 474);
-    g.fillStyle = '#e58f76';
-    g.fillRect(180, 505, 60, 5);
   });
 }

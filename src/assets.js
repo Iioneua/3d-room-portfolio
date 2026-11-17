@@ -7,13 +7,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const BASE = `${import.meta.env.BASE_URL}assets/`;
 
 const MODELS = [
+  'pachira_aquatica_01',
   'potted_plant_02',
   'potted_plant_04',
   'mid_century_lounge_chair',
-  'desk_lamp_arm_01',
-  'modern_ceiling_lamp_01',
   'modern_wooden_cabinet',
-  'book_encyclopedia_set_01',
   'ceramic_vase_01',
   'ceramic_vase_02',
   'standing_picture_frame_01',
@@ -27,11 +25,9 @@ const SURFACES = {
   walnut: { dir: 'walnut_veneer', size: 1.8, maps: ['diffuse', 'nor_gl', 'rough'] },
   wool: { dir: 'poly_wool_herringbone', size: 0.27, maps: ['diffuse', 'nor_gl'] },
   linen: { dir: 'rough_linen', size: 0.27, maps: ['nor_gl'] },
-  knit: { dir: 'knitted_fleece', size: 0.27, maps: ['nor_gl'] },
-  velvet: { dir: 'velour_velvet', size: 0.28, maps: ['nor_gl'] },
 };
 
-const PHOTOS = ['photo-0', 'photo-1', 'photo-2', 'photo-3', 'photo-4', 'frame'];
+const PHOTOS = ['photo-0', 'photo-1', 'photo-2', 'photo-3'];
 
 export async function loadAssets(onProgress) {
   const manager = new THREE.LoadingManager();

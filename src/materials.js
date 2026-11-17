@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Surface materials for the room. Wood, plaster, the floor and fabrics use scanned
-// textures (see assets.js); the rug pattern and book spines are painted on canvases.
+// textures (see assets.js); the book spines are painted on a canvas.
 
 function rng(seed) {
   let a = seed;
@@ -25,19 +25,6 @@ function canvasTexture(canvas, srgb = true) {
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.anisotropy = 8;
   return t;
-}
-
-// Fine random speckle over a whole canvas.
-function speckle(g, w, h, amount, r) {
-  const img = g.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (r() - 0.5) * amount;
-    d[i] += n;
-    d[i + 1] += n;
-    d[i + 2] += n;
-  }
-  g.putImageData(img, 0, 0);
 }
 
 // ---------- UVs in metres ----------
@@ -69,117 +56,6 @@ export function metricUVs(geometry) {
     uv.setXY(i, p[ua] + offset[0], p[va] + offset[1]);
   }
   uv.needsUpdate = true;
-}
-
-// ---------- Rug ----------
-// A flat-woven wool rug: a faded geometric field inside a few border bands.
-function rugTexture(W, H) {
-  const S = 1024;
-  const w = S;
-  const h = Math.round((S * H) / W);
-  const c = makeCanvas(w, h);
-  const g = c.getContext('2d');
-  const r = rng(13);
-  const cream = '#d8ccb6';
-  const rust = '#a2593e';
-  const indigo = '#3f4b5e';
-  const ochre = '#c09453';
-  const sage = '#7d8b75';
-
-  g.fillStyle = cream;
-  g.fillRect(0, 0, w, h);
-
-  // Border bands.
-  const bands = [[0, 26, indigo], [26, 8, cream], [34, 18, rust], [52, 6, cream], [58, 10, ochre], [68, 8, cream]];
-  for (const [inset, size, color] of bands) {
-    g.fillStyle = color;
-    g.fillRect(inset, inset, w - inset * 2, size);
-    g.fillRect(inset, h - inset - size, w - inset * 2, size);
-    g.fillRect(inset, inset, size, h - inset * 2);
-    g.fillRect(w - inset - size, inset, size, h - inset * 2);
-  }
-  // Small triangles along the rust band.
-  g.fillStyle = cream;
-  for (let x = 40; x < w - 40; x += 22) {
-    g.beginPath();
-    g.moveTo(x, 52);
-    g.lineTo(x + 11, 38);
-    g.lineTo(x + 22, 52);
-    g.fill();
-    g.beginPath();
-    g.moveTo(x, h - 52);
-    g.lineTo(x + 11, h - 38);
-    g.lineTo(x + 22, h - 52);
-    g.fill();
-  }
-
-  // Field of stepped diamonds.
-  const fx = 96;
-  const fy = 96;
-  const fw = w - fx * 2;
-  const fh = h - fy * 2;
-  g.save();
-  g.beginPath();
-  g.rect(fx, fy, fw, fh);
-  g.clip();
-  const cols = 4;
-  const dw = fw / cols;
-  const dh = dw * 1.35;
-  const rows = Math.ceil(fh / dh) + 1;
-  for (let row = -1; row < rows; row++) {
-    for (let col = -1; col <= cols; col++) {
-      const cx = fx + dw / 2 + col * dw + (row % 2 ? dw / 2 : 0);
-      const cy = fy + row * dh * 0.5 + dh / 2;
-      const ring = [indigo, cream, rust, cream, (row + col) % 3 === 0 ? ochre : sage];
-      ring.forEach((color, k) => {
-        const s = 1 - k * 0.19;
-        g.fillStyle = color;
-        g.beginPath();
-        // Stepped outline, as woven rugs have.
-        const steps = 7;
-        const rx = (dw / 2) * s;
-        const ry = (dh / 2) * s;
-        g.moveTo(cx, cy - ry);
-        for (let i = 1; i <= steps; i++) {
-          g.lineTo(cx + (rx * (i - 1)) / steps + rx / steps, cy - ry + (ry * (i - 1)) / steps);
-          g.lineTo(cx + (rx * i) / steps, cy - ry + (ry * i) / steps);
-        }
-        for (let i = 1; i <= steps; i++) {
-          g.lineTo(cx + rx - (rx * i) / steps, cy + (ry * (i - 1)) / steps + ry / steps);
-          g.lineTo(cx + rx - (rx * i) / steps, cy + (ry * i) / steps);
-        }
-        for (let i = 1; i <= steps; i++) {
-          g.lineTo(cx - (rx * i) / steps, cy + ry - (ry * (i - 1)) / steps - ry / steps);
-          g.lineTo(cx - (rx * i) / steps, cy + ry - (ry * i) / steps);
-        }
-        for (let i = 1; i <= steps; i++) {
-          g.lineTo(cx - rx + (rx * i) / steps, cy - (ry * (i - 1)) / steps - ry / steps);
-          g.lineTo(cx - rx + (rx * i) / steps, cy - (ry * i) / steps);
-        }
-        g.closePath();
-        g.fill();
-      });
-    }
-  }
-  g.restore();
-
-  // Weft lines, uneven dye and wear in the middle where people walk.
-  for (let y = 0; y < h; y += 3) {
-    g.fillStyle = `rgba(40, 28, 18, ${0.03 + r() * 0.05})`;
-    g.fillRect(0, y, w, 1);
-  }
-  for (let i = 0; i < 260; i++) {
-    g.fillStyle = r() > 0.5 ? 'rgba(255, 246, 228, 0.05)' : 'rgba(60, 40, 25, 0.05)';
-    const y = r() * h;
-    g.fillRect(0, y, w, 2 + r() * 8);
-  }
-  const wear = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.55);
-  wear.addColorStop(0, 'rgba(236, 226, 206, 0.22)');
-  wear.addColorStop(1, 'rgba(236, 226, 206, 0)');
-  g.fillStyle = wear;
-  g.fillRect(0, 0, w, h);
-  speckle(g, w, h, 26, r);
-  return canvasTexture(c);
 }
 
 // ---------- Books ----------
@@ -341,12 +217,6 @@ export function createMaterials(assets) {
       true
     );
 
-  const rugW = 2.4;
-  const rugH = 3.2;
-  const rugNormal = S.wool.nor_gl.clone();
-  rugNormal.repeat.set(rugW / 0.27, rugH / 0.27);
-  rugNormal.needsUpdate = true;
-
   return {
     floor: std(
       {
@@ -354,13 +224,13 @@ export function createMaterials(assets) {
         normalMap: S.floor.nor_gl,
         roughnessMap: S.floor.rough,
         roughness: 0.9,
-        color: '#f2e6da',
+        color: '#a8968a',
       },
       true
     ),
     wall: std(
       {
-        color: '#ebe6df',
+        color: '#d8d5d3',
         normalMap: S.plaster.nor_gl,
         normalScale: new THREE.Vector2(0.55, 0.55),
         roughnessMap: S.plaster.rough,
@@ -370,14 +240,13 @@ export function createMaterials(assets) {
     ),
     ceiling: std(
       {
-        color: '#f1eee9',
+        color: '#e4e2df',
         normalMap: S.plaster.nor_gl,
         normalScale: new THREE.Vector2(0.3, 0.3),
         roughness: 0.95,
       },
       true
     ),
-    rug: { width: rugW, height: rugH, material: std({ map: rugTexture(rugW, rugH), normalMap: rugNormal, roughness: 1 }) },
     books: std({ map: bookAtlas(), roughness: 0.78 }),
     glass: physical({
       color: '#ffffff',
@@ -387,7 +256,6 @@ export function createMaterials(assets) {
       metalness: 0,
       depthWrite: false,
     }),
-    mirror: std({ color: '#eef0f0', metalness: 1, roughness: 0.03 }),
     black: std({ color: '#141416', roughness: 0.4 }),
     dot: softDot(),
     photos: assets.photos,
@@ -427,11 +295,9 @@ export function createMaterials(assets) {
       cached(`ceramic${color}`, () => physical({ color, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.15 })),
     metal: (color, rough = 0.32) =>
       cached(`metal${color}${rough}`, () => std({ color, metalness: 1, roughness: rough })),
-    // Upholstery: herringbone wool. Curtains: linen. Throws: knit. Cushions: velvet.
+    // Upholstery and rugs: herringbone wool. Curtains: linen.
     wool: (color, side = THREE.FrontSide) => cached(`wool${color}${side}`, () => cloth('wool', color, side, 0.8)),
     linen: (color, side = THREE.FrontSide) => cached(`linen${color}${side}`, () => cloth('linen', color, side, 0.7)),
-    knit: (color) => cached(`knit${color}`, () => cloth('knit', color, THREE.FrontSide, 1.2)),
-    velvet: (color) => cached(`velvet${color}`, () => cloth('velvet', color, THREE.FrontSide, 0.6)),
     // Something that gives off light: bulbs, LEDs.
     glow: (color, strength = 2) =>
       std({ color: '#000000', emissive: color, emissiveIntensity: strength, roughness: 0.8, side: THREE.DoubleSide }),

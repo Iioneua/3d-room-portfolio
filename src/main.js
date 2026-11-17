@@ -15,31 +15,42 @@ import { profile, stations } from './content.js';
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 
-const HOME_FOV = 62;
-const FOCUS_FOV = 50;
+const HOME_FOV = 58;
+const FOCUS_FOV = 48;
 const MAX_PITCH = 0.7;
 // How far you can turn your head from where you are facing (radians).
-const TURN_HOME = 0.9;
+const TURN_HOME = 1.3;
 const TURN_FOCUS = 0.8;
-// Camera exposure: lower is darker. The sky outside is far brighter than the room.
-const EXPOSURE = 0.85;
+// Camera exposure: lower is darker.
+const EXPOSURE = 0.9;
 
 // ---------- Text on the page ----------
 document.title = `${profile.name} · ${profile.role}`;
 $('brand-name').textContent = profile.name;
-$('brand-role').textContent = profile.role;
+$('brand-tagline').textContent = profile.tagline;
 $('intro-role').textContent = profile.role;
 $('intro-title').textContent = `Welcome to ${profile.name}'s room`;
 $('intro-tagline').textContent = profile.tagline;
 document.body.classList.add('intro');
 
+// Text drawn onto the screens and the plaque needs the web fonts, so wait for them
+// (but never more than a few seconds).
+function fontsReady() {
+  const fonts = ['400 40px "Instrument Serif"', '500 16px Inter', '600 16px Inter'];
+  const loaded = Promise.all(fonts.map((f) => document.fonts.load(f))).catch(() => {});
+  return Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, 3000))]);
+}
+
 // The room needs its models and textures before it can be built.
 const enter = $('enter');
 enter.disabled = true;
 enter.textContent = 'Setting up the room…';
-const assets = await loadAssets((share) => {
-  enter.textContent = `Setting up the room… ${Math.round(share * 100)}%`;
-});
+const [assets] = await Promise.all([
+  loadAssets((share) => {
+    enter.textContent = `Setting up the room… ${Math.round(share * 100)}%`;
+  }),
+  fontsReady(),
+]);
 
 // ---------- Scene ----------
 // ?quality=high or ?quality=low fixes the quality; otherwise it adapts to the computer.
@@ -63,12 +74,12 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 6000);
 camera.rotation.order = 'YXZ';
 const room = buildRoom(scene, assets, stations, profile);
-const outside = buildOutside(scene, room.root);
+const outside = buildOutside(scene);
 
 // Photograph the lit room from its centre and use that picture as ambient light.
 // It gives every surface soft bounced light and reflections that match the room.
 const pmrem = new THREE.PMREMGenerator(renderer);
-const baked = pmrem.fromScene(scene, 0.02, 0.05, 6000, { position: new THREE.Vector3(-0.4, 1.7, 0.4) });
+const baked = pmrem.fromScene(scene, 0.02, 0.05, 6000, { position: new THREE.Vector3(0.3, 1.5, -0.8) });
 scene.environment = baked.texture;
 scene.environmentIntensity = 1.0;
 room.bounce.intensity = 0.2;
@@ -85,7 +96,7 @@ composer.addPass(new RenderPass(scene, camera));
 const occlusion = new GTAOPass(scene, camera, 1, 1);
 occlusion.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.5, thickness: 1.2, scale: 1.2, samples: 12 });
 const drawOcclusion = occlusion.render.bind(occlusion);
-const skipOcclusion = [...room.noAO, outside.sky, outside.water];
+const skipOcclusion = [...room.noAO, outside.sky];
 occlusion.render = (...args) => {
   for (const o of skipOcclusion) o.visible = false;
   drawOcclusion(...args);
@@ -94,7 +105,7 @@ occlusion.render = (...args) => {
 occlusion.enabled = fixedQuality !== 'low';
 composer.addPass(occlusion);
 
-// Glow around the sun, lamps and screens.
+// Glow around the lamps, LED strips and screens.
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.7, 1.3));
 composer.addPass(new OutputPass());
 
@@ -191,7 +202,7 @@ let cardTimer = null;
 
 function fillCard(id) {
   const s = stations[id];
-  $('card-kicker').textContent = s.kicker;
+  $('card-kicker').textContent = s.where || s.kicker;
   $('card-title').textContent = s.title;
   $('card-body').textContent = s.body;
   $('card-items').replaceChildren(
@@ -211,8 +222,13 @@ function fillCard(id) {
   $('card-hint').textContent = s.objectHint || '';
 }
 
+function markPill(id) {
+  for (const [key, el] of Object.entries(pills)) el.classList.toggle('active', key === id);
+}
+
 function focus(id, instant = false) {
   current = id;
+  markPill(id);
   document.body.classList.add('focused');
   card.classList.remove('open');
   clearTimeout(cardTimer);
@@ -233,6 +249,7 @@ function focus(id, instant = false) {
 function back() {
   if (!current) return;
   current = null;
+  markPill(null);
   clearTimeout(cardTimer);
   card.classList.remove('open');
   document.body.classList.remove('focused');
@@ -244,6 +261,7 @@ function openLink(id) {
 }
 
 $('back').addEventListener('click', back);
+$('card-close').addEventListener('click', back);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') back();
   if (tween) return;
@@ -251,13 +269,31 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') turnBy(-0.12);
 });
 
-// ---------- Floating labels ----------
+// ---------- Places: pills at the top and markers over the objects ----------
+const pills = {};
+for (const id of Object.keys(stations)) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'pill';
+  el.textContent = stations[id].label;
+  el.addEventListener('click', () => {
+    if (current === id) back();
+    else focus(id);
+  });
+  $('pills').append(el);
+  pills[id] = el;
+}
+
 const labelLayer = $('labels');
 const labels = Object.keys(views).map((id) => {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'hotspot';
-  el.textContent = stations[id].label;
+  el.setAttribute('aria-label', stations[id].label);
+  const text = document.createElement('span');
+  text.className = 'hotspot-label';
+  text.textContent = stations[id].label;
+  el.append(text);
   el.addEventListener('click', () => focus(id));
   labelLayer.append(el);
   return { id, el };

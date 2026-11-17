@@ -1,17 +1,17 @@
 # 3D Room Portfolio
 
-A personal website presented as a cozy, realistic 3D room at sunset, seen from inside as if you were standing in it. Drag to look around. Each corner holds an object that stands for a social profile or a piece of information about me. Clicking an object walks you over to it, and the object and its info card show the content and the link.
+A personal website presented as a realistic 3D room at dusk, seen from the middle of the room as if you were standing in it. Drag to look around. Objects in the room stand for a social profile or a piece of information about me; small markers float over them. Clicking an object (or its name in the row of buttons at the top) walks you over to it, and an info card shows the content and the link.
 
 ## What is in the room
 
 | Object | Shows | Opens |
 | --- | --- | --- |
-| Desk and monitors | Projects | GitHub |
-| Framed page on the wall | Experience | LinkedIn |
-| Photos on a string | Life outside work | Instagram |
-| Bookshelf | About me | Contact |
+| Ultrawide monitor on the desk | Projects | GitHub |
+| Plaque on the wall | Experience | LinkedIn |
+| Framed photos on the ledge | Life outside work | Instagram |
+| Floating shelves | About me | Contact |
 
-The window looks out on a sunset over the sea, with ambient waves, breeze and birds generated in the browser.
+The desk stands against a wall of wooden slats with two floating shelves lit by warm LED strips. A softbox and a globe lamp light the right side. The window looks out on a lake at dusk, with mountains and town lights, and ambient sound generated in the browser.
 
 ## Run it
 
@@ -28,19 +28,19 @@ Add `?view=desk`, `?view=frame`, `?view=photos`, `?view=shelf` or `?view=room` t
 
 All text and links live in [src/content.js](src/content.js). The current content is placeholder.
 
-The photos on the string and in the desk frame are placeholders too. To use your own, replace `public/assets/photos/photo-0.jpg` to `photo-4.jpg` and `frame.jpg` with square JPEGs of about 512 x 512 pixels.
+The framed photos on the ledge are placeholders too. To use your own, replace `public/assets/photos/photo-0.jpg` to `photo-3.jpg` with square JPEGs of about 512 x 512 pixels.
 
 ## Assets
 
-The scanned models (plants, lounge chair, sideboard, lamps, vases, books, photo frame), the surface textures (floor, plaster, oak, walnut, fabrics) and the placeholder photos come from [Poly Haven](https://polyhaven.com) and are CC0. They live in `public/assets` at 1k resolution, re-compressed, about 15 MB in total. The rest of the room (walls, sofa, desk, monitors, keyboard, bookshelf, rug pattern, book spines) is built in code.
+The scanned models (money tree, pothos and succulent, lounge chair, sideboard, vases, the small picture frame), the surface textures (floor, plaster, oak, walnut, fabrics) and the placeholder photos come from [Poly Haven](https://polyhaven.com) and are CC0. They live in `public/assets` at 1k resolution, re-compressed, about 13 MB in total. Everything else (walls, slat wall, shelves, desk, monitor, laptop, microphone, chair, softbox, lamps, books) is built in code. The fonts, Instrument Serif and Inter, load from Google Fonts.
 
 ## Where things are
 
 - `src/room.js`: the room, furniture, lights and camera positions
 - `src/assets.js`: loads the models, textures and photos
-- `src/materials.js`: surface materials, the rug and the book spines
-- `src/textures.js`: what is drawn on the screens, the framed page and the posters
-- `src/outside.js`: the sunset sky and sea outside the window
+- `src/materials.js`: surface materials and the book spines
+- `src/textures.js`: what is drawn on the screens, the plaque and the prints
+- `src/outside.js`: the lake at dusk outside the window
 - `src/audio.js`: the ambient sound
 - `src/main.js`: loading, camera movement, clicks and the info card
 - `src/style.css`: page styling
