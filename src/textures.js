@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // prints) is drawn here on a canvas, from the data in content.js.
 
 const SANS = '"Inter", "Segoe UI", system-ui, sans-serif';
-const MONO = '"Cascadia Code", Consolas, "Courier New", monospace';
+const MONO = '"JetBrains Mono", "Cascadia Code", Consolas, monospace';
 const SERIF = '"Instrument Serif", Georgia, serif';
 
 function canvas(w, h) {
@@ -49,161 +49,368 @@ function fit(g, text, maxWidth) {
   return s + '…';
 }
 
-const shortUrl = (url) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/^mailto:/, '').replace(/\/$/, '');
-
-// A dusk landscape like the view from the window, used as the desktop wallpaper.
-function wallpaper(g, w, h) {
-  const sky = g.createLinearGradient(0, 0, 0, h * 0.62);
-  sky.addColorStop(0, '#2b2d5c');
-  sky.addColorStop(0.45, '#7a5f9a');
-  sky.addColorStop(0.8, '#e08fa0');
-  sky.addColorStop(1, '#f7b892');
-  g.fillStyle = sky;
-  g.fillRect(0, 0, w, h * 0.62);
-  const r = rng(4);
-  const ridge = (base, amp, color, seed) => {
-    const rr = rng(seed);
-    g.fillStyle = color;
-    g.beginPath();
-    g.moveTo(0, h * 0.62);
-    let y = base;
-    for (let x = 0; x <= w; x += 8) {
-      y += (rr() - 0.5) * amp;
-      y = Math.min(Math.max(y, base - amp * 4), base + amp * 2);
-      g.lineTo(x, h * y);
-    }
-    g.lineTo(w, h * 0.62);
-    g.fill();
+// Smooth 1D noise for mountain ridges.
+function ridgeNoise(seed) {
+  const r = rng(seed);
+  const values = Array.from({ length: 1024 }, r);
+  const at = (i) => values[((i % 1024) + 1024) % 1024];
+  const smooth = (x) => {
+    const i = Math.floor(x);
+    const f = x - i;
+    const u = f * f * (3 - 2 * f);
+    return at(i) + (at(i + 1) - at(i)) * u;
   };
-  ridge(0.5, 0.012, '#9a7aa6', 3);
-  ridge(0.55, 0.01, '#6c5687', 8);
-  ridge(0.59, 0.008, '#463a63', 13);
-  const lake = g.createLinearGradient(0, h * 0.62, 0, h);
-  lake.addColorStop(0, '#d69aa4');
-  lake.addColorStop(0.4, '#6d5a8c');
-  lake.addColorStop(1, '#1c1d3a');
+  return (x) => {
+    let sum = 0;
+    let amp = 0.5;
+    let freq = 1;
+    let norm = 0;
+    for (let o = 0; o < 5; o++) {
+      sum += amp * smooth(x * freq + o * 17.3);
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2.1;
+    }
+    return sum / norm;
+  };
+}
+
+// A dusk lake with mountains, like the view from the window. It is the wallpaper of
+// the monitor and of the computer's desktop. Horizontal positions are measured in
+// screen heights from the centre, so a wider screen simply shows more of the same view.
+export function wallpaper(g, w, h) {
+  const horizon = h * 0.6;
+  const X = (x) => (x - w / 2) / h;
+
+  const sky = g.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, '#171a42');
+  sky.addColorStop(0.32, '#35306c');
+  sky.addColorStop(0.62, '#86599a');
+  sky.addColorStop(0.86, '#df869a');
+  sky.addColorStop(1, '#f6b48f');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, w, horizon + 1);
+
+  // Glow where the sun has just set.
+  const sunX = w / 2 + h * 0.3;
+  const glow = g.createRadialGradient(sunX, horizon, 0, sunX, horizon, h * 0.75);
+  glow.addColorStop(0, 'rgba(255, 205, 160, 0.55)');
+  glow.addColorStop(0.45, 'rgba(255, 150, 160, 0.14)');
+  glow.addColorStop(1, 'rgba(255, 150, 160, 0)');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, w, horizon);
+
+  // Stars, fading out towards the horizon.
+  const r = rng(11);
+  const stars = Math.round((w * h) / 9000);
+  for (let i = 0; i < stars; i++) {
+    const y = Math.pow(r(), 1.6) * horizon * 0.6;
+    const a = (1 - y / (horizon * 0.6)) * (0.25 + r() * 0.65);
+    g.fillStyle = `rgba(255, 244, 236, ${a.toFixed(3)})`;
+    const s = Math.max(1, h * (r() < 0.08 ? 0.0024 : 0.0013));
+    g.fillRect(r() * w, y, s, s);
+  }
+
+  // Thin clouds lit from below.
+  for (let i = 0; i < 9; i++) {
+    const cx = r() * w;
+    const cy = horizon * (0.42 + r() * 0.36);
+    const cloud = g.createRadialGradient(cx, cy, 0, cx, cy, h * (0.2 + r() * 0.25));
+    cloud.addColorStop(0, `rgba(255, 186, 190, ${(0.08 + r() * 0.1).toFixed(3)})`);
+    cloud.addColorStop(1, 'rgba(255, 186, 190, 0)');
+    g.save();
+    g.translate(cx, cy);
+    g.scale(1, 0.12);
+    g.translate(-cx, -cy);
+    g.fillStyle = cloud;
+    g.fillRect(cx - h * 0.5, cy - h * 0.5, h, h);
+    g.restore();
+  }
+
+  const layers = [
+    { top: 0.37, amp: 0.2, scale: 2.2, seed: 3, a: '#b48bb0', b: '#a07ca6' },
+    { top: 0.45, amp: 0.13, scale: 3.4, seed: 8, a: '#7d5d96', b: '#67518a' },
+    { top: 0.52, amp: 0.075, scale: 5.5, seed: 13, a: '#45375f', b: '#352b50' },
+  ];
+  // Height of a ridge at x: sharp peaks from folded noise over a softer base.
+  const ridge = (n, x) => {
+    const peaks = 1 - Math.abs(2 * n(x) - 1);
+    return 1 - (0.7 * peaks + 0.3 * n(x * 0.5 + 40));
+  };
+  const drawMountains = () => {
+    for (const L of layers) {
+      const n = ridgeNoise(L.seed);
+      g.beginPath();
+      g.moveTo(0, horizon + 1);
+      for (let x = 0; x <= w + 2; x += 2) g.lineTo(x, Math.min(horizon, h * (L.top + L.amp * ridge(n, X(x) * L.scale + L.seed))));
+      g.lineTo(w, horizon + 1);
+      g.closePath();
+      const fill = g.createLinearGradient(0, h * L.top, 0, horizon);
+      fill.addColorStop(0, L.a);
+      fill.addColorStop(1, L.b);
+      g.fillStyle = fill;
+      g.fill();
+    }
+  };
+  drawMountains();
+
+  // Haze sitting on the water line.
+  const haze = g.createLinearGradient(0, horizon - h * 0.07, 0, horizon);
+  haze.addColorStop(0, 'rgba(240, 170, 175, 0)');
+  haze.addColorStop(1, 'rgba(240, 170, 175, 0.32)');
+  g.fillStyle = haze;
+  g.fillRect(0, horizon - h * 0.07, w, h * 0.07);
+
+  // The lake, with the mountains mirrored in it.
+  const lake = g.createLinearGradient(0, horizon, 0, h);
+  lake.addColorStop(0, '#d995a2');
+  lake.addColorStop(0.28, '#7d6295');
+  lake.addColorStop(0.7, '#2c2853');
+  lake.addColorStop(1, '#14152c');
   g.fillStyle = lake;
-  g.fillRect(0, h * 0.62, w, h * 0.38);
-  for (let i = 0; i < 70; i++) {
-    const x = r() * w;
-    g.fillStyle = `rgba(255, 214, 160, ${0.5 + r() * 0.5})`;
-    g.fillRect(x, h * 0.615 - r() * 3, 2, 2);
-    g.fillStyle = 'rgba(255, 200, 150, 0.18)';
-    g.fillRect(x, h * 0.63, 2, 10 + r() * 20);
+  g.fillRect(0, horizon, w, h - horizon);
+  g.save();
+  g.beginPath();
+  g.rect(0, horizon, w, h - horizon);
+  g.clip();
+  g.globalAlpha = 0.32;
+  g.translate(0, horizon * 2);
+  g.scale(1, -1);
+  drawMountains();
+  g.restore();
+  const fade = g.createLinearGradient(0, horizon, 0, h);
+  fade.addColorStop(0, 'rgba(20, 21, 44, 0)');
+  fade.addColorStop(0.5, 'rgba(20, 21, 44, 0.55)');
+  fade.addColorStop(1, 'rgba(20, 21, 44, 0.9)');
+  g.fillStyle = fade;
+  g.fillRect(0, horizon, w, h - horizon);
+
+  // The sunset glow on the water.
+  const shine = g.createRadialGradient(sunX, horizon, 0, sunX, horizon, h * 0.35);
+  shine.addColorStop(0, 'rgba(255, 196, 170, 0.35)');
+  shine.addColorStop(1, 'rgba(255, 196, 170, 0)');
+  g.save();
+  g.translate(sunX, horizon);
+  g.scale(0.5, 1);
+  g.translate(-sunX, -horizon);
+  g.fillStyle = shine;
+  g.fillRect(sunX - h, horizon, h * 2, h * 0.4);
+  g.restore();
+
+  // Ripples.
+  for (let i = 0; i < (w / h) * 140; i++) {
+    const y = horizon + Math.pow(r(), 1.5) * (h - horizon);
+    const len = h * (0.01 + r() * 0.06) * (0.4 + (y - horizon) / (h - horizon));
+    g.fillStyle = `rgba(255, 214, 205, ${(0.03 + r() * 0.09).toFixed(3)})`;
+    g.fillRect(r() * w, y, len, Math.max(1, h * 0.0012));
+  }
+
+  // Town lights along the shore, with their reflections.
+  const towns = Math.max(3, Math.round((w / h) * 3));
+  for (let t = 0; t < towns; t++) {
+    const cx = r() * w;
+    const spread = h * (0.05 + r() * 0.12);
+    const count = 6 + Math.floor(r() * 14);
+    for (let i = 0; i < count; i++) {
+      const x = cx + (r() - 0.5) * spread * 2;
+      const y = horizon - h * (0.002 + r() * 0.012);
+      const s = Math.max(1.2, h * 0.0022);
+      const light = g.createRadialGradient(x, y, 0, x, y, s * 4);
+      light.addColorStop(0, 'rgba(255, 226, 170, 0.95)');
+      light.addColorStop(0.3, 'rgba(255, 200, 140, 0.35)');
+      light.addColorStop(1, 'rgba(255, 200, 140, 0)');
+      g.fillStyle = light;
+      g.fillRect(x - s * 4, y - s * 4, s * 8, s * 8);
+      g.fillStyle = 'rgba(255, 210, 160, 0.11)';
+      g.fillRect(x - s / 2, horizon + h * 0.003, s, h * (0.006 + r() * 0.022));
+    }
   }
 }
 
-function windowFrame(g, x, y, w, h, title) {
-  g.fillStyle = 'rgba(22, 20, 32, 0.9)';
-  rounded(g, x, y, w, h, 14);
-  g.fill();
-  g.strokeStyle = 'rgba(255,255,255,0.08)';
-  g.lineWidth = 1.5;
-  g.stroke();
-  ['#f0766a', '#f2c25b', '#69c97a'].forEach((c, i) => {
-    g.fillStyle = c;
-    g.beginPath();
-    g.arc(x + 20 + i * 18, y + 18, 5.5, 0, Math.PI * 2);
-    g.fill();
-  });
-  g.fillStyle = 'rgba(235, 228, 245, 0.6)';
-  g.font = `500 15px ${SANS}`;
-  g.textAlign = 'center';
-  g.fillText(title, x + w / 2, y + 23);
-  g.textAlign = 'left';
-}
-
-// The ultrawide monitor: wallpaper, menu bar, clock, a terminal and the project list.
+// What the monitor shows when nobody is using it: the same desktop you get when you
+// go into the computer (menu bar, clock, Finder on Projects, a terminal and the dock).
+// It is drawn in the desktop's own units (about 1530 by 640) and scaled to the canvas.
 export function desktopScreen(station, profile) {
   const W = 2048;
-  const H = 606;
+  const H = 856;
+  const k = W / 1530;
   const c = canvas(W, H);
   const g = c.getContext('2d');
   const base = canvas(W, H);
   wallpaper(base.getContext('2d'), W, H);
+  const host = `${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-room`;
+  const names = station.items.slice(0, 4).map((item) => item.title);
+
+  const font = (weight, size, family = SANS) => `${weight} ${size * k}px ${family}`;
+  const text = (t, x, y, color, f, align = 'left') => {
+    g.font = f;
+    g.fillStyle = color;
+    g.textAlign = align;
+    g.fillText(t, x * k, y * k);
+  };
+  const box = (x, y, w, h, r, fill) => {
+    g.fillStyle = fill;
+    rounded(g, x * k, y * k, w * k, h * k, r * k);
+    g.fill();
+  };
+  const lights = (x, y) =>
+    ['#ff5f57', '#febc2e', '#28c840'].forEach((col, i) => {
+      g.fillStyle = col;
+      g.beginPath();
+      g.arc((x + i * 20) * k, y * k, 6 * k, 0, Math.PI * 2);
+      g.fill();
+    });
+  const folder = (x, y, s) => {
+    box(x + s * 0.06, y + s * 0.16, s * 0.88, s * 0.66, s * 0.06, '#4c9fe0');
+    box(x + s * 0.06, y + s * 0.3, s * 0.88, s * 0.52, s * 0.06, '#78bdf3');
+  };
 
   function draw() {
     const now = new Date();
     const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     g.drawImage(base, 0, 0);
-    // Menu bar.
-    g.fillStyle = 'rgba(16, 14, 26, 0.45)';
-    g.fillRect(0, 0, W, 30);
-    g.fillStyle = 'rgba(255,255,255,0.85)';
-    g.font = `600 15px ${SANS}`;
-    g.fillText(profile.name, 22, 20);
-    g.font = `15px ${SANS}`;
-    ['File', 'Edit', 'View', 'Go', 'Window'].forEach((t, i) => g.fillText(t, 100 + i * 62, 20));
-    g.textAlign = 'right';
-    g.fillText(`${now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}   ${time}`, W - 22, 20);
-    g.textAlign = 'center';
-    // Clock.
-    g.fillStyle = 'rgba(255, 255, 255, 0.92)';
-    g.font = `400 92px ${SERIF}`;
-    g.fillText(time, W / 2, 132);
-    g.font = `500 17px ${SANS}`;
-    g.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    g.fillText(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), W / 2, 160);
-    g.textAlign = 'left';
+
+    // Menu bar, with the sun-and-peaks mark.
+    g.fillStyle = 'rgba(24, 20, 40, 0.45)';
+    g.fillRect(0, 0, W, 28 * k);
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.arc(25 * k, 10 * k, 2.6 * k, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.moveTo(11 * k, 21 * k);
+    g.lineTo(17 * k, 11.5 * k);
+    g.lineTo(20.5 * k, 16.5 * k);
+    g.lineTo(22.6 * k, 13.7 * k);
+    g.lineTo(28 * k, 21 * k);
+    g.closePath();
+    g.fill();
+    let mx = 44;
+    for (const [i, m] of ['Finder', 'File', 'Edit', 'View', 'Go', 'Window', 'Help'].entries()) {
+      text(m, mx, 19, '#ffffff', font(i ? 400 : 700, 13));
+      mx += g.measureText(m).width / k + 18;
+    }
+    const day = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
+    text(`${day}  ${time}`, 1516, 19, '#ffffff', font(400, 13), 'right');
+
+    // Clock on the desktop.
+    text(time, 765, 118, 'rgba(255, 255, 255, 0.92)', font(400, 76, SERIF), 'center');
+    text(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), 765, 146, 'rgba(255, 255, 255, 0.72)', font(500, 14), 'center');
+
+    // Desktop icons, top right.
+    folder(1427, 40, 64);
+    text('Projects', 1459, 118, '#ffffff', font(500, 12), 'center');
+    box(1441, 136, 36, 46, 4, '#fdfdfd');
+    text('Welcome.md', 1459, 198, '#ffffff', font(500, 12), 'center');
+
+    // Finder on the Projects folder.
+    const fx = 150;
+    const fy = 180;
+    const fw = 620;
+    const fh = 330;
+    box(fx, fy, fw, fh, 11, '#1e1e20');
+    g.save();
+    rounded(g, fx * k, fy * k, fw * k, fh * k, 11 * k);
+    g.clip();
+    g.fillStyle = 'rgba(52, 46, 66, 0.96)';
+    g.fillRect(fx * k, fy * k, 150 * k, fh * k);
+    g.fillStyle = '#262628';
+    g.fillRect((fx + 150) * k, fy * k, (fw - 150) * k, 46 * k);
+    g.restore();
+    lights(fx + 20, fy + 22);
+    text('Favourites', fx + 16, fy + 62, 'rgba(255, 255, 255, 0.42)', font(600, 10.5));
+    ['Projects', 'Desktop', 'Documents', 'Downloads'].forEach((place, i) => {
+      if (!i) box(fx + 8, fy + 70, 134, 24, 6, 'rgba(255, 255, 255, 0.12)');
+      box(fx + 18, fy + 77 + i * 26, 12, 10, 2, '#3d9bff');
+      text(place, fx + 38, fy + 87 + i * 26, '#e8e8ea', font(400, 12.5));
+    });
+    text('Projects', fx + 175, fy + 29, '#ececee', font(700, 14.5));
+    names.forEach((name, i) => {
+      const ix = fx + 172 + i * 108;
+      folder(ix + 18, fy + 66, 64);
+      g.font = font(400, 12);
+      text(fit(g, name, 100 * k), ix + 50, fy + 152, '#e4e4e7', font(400, 12), 'center');
+    });
 
     // Terminal.
-    const tx = 560;
-    const ty = 200;
-    windowFrame(g, tx, ty, 430, 300, 'zsh — ~/projects');
-    g.font = `15px ${MONO}`;
+    const tx = 820;
+    const ty = 236;
+    const tw = 570;
+    const th = 270;
+    box(tx, ty, tw, th, 11, 'rgba(26, 26, 30, 0.95)');
+    g.save();
+    rounded(g, tx * k, ty * k, tw * k, th * k, 11 * k);
+    g.clip();
+    g.fillStyle = 'rgba(56, 56, 60, 0.95)';
+    g.fillRect(tx * k, ty * k, tw * k, 30 * k);
+    g.restore();
+    lights(tx + 20, ty + 15);
+    text('guest — -zsh — 80×24', tx + tw / 2, ty + 20, '#dadadd', font(600, 12), 'center');
+    const prompt = (cmd) => [[`guest@${host}`, '#8be3a1'], [' ~ ', '#7fb6ff'], [`% ${cmd}`, '#e6e6e6']];
     const lines = [
-      ['#8be3a1', '➜ ', '#e9e4f5', 'git pull'],
-      ['#9b95b8', '', '#9b95b8', 'Already up to date.'],
-      ['#8be3a1', '➜ ', '#e9e4f5', 'npm run dev'],
-      ['#9b95b8', '', '#c7a6ff', '  VITE ready in 249 ms'],
-      ['#9b95b8', '', '#9b95b8', '  ➜ Local: localhost:5173'],
-      ['#8be3a1', '➜ ', '#e9e4f5', 'git commit -m "polish"'],
-      ['#9b95b8', '', '#9b95b8', '[main 9fbba53] polish'],
-      ['#8be3a1', '➜ ', '#e9e4f5', '▍'],
+      prompt('ls Projects'),
+      [[names.join('   '), '#7fb6ff']],
+      prompt('node Documents/hello.js'),
+      [['Hello, visitor!', '#e6e6e6']],
+      [['Squares: [ 1, 4, 9, 16, 25 ]', '#e6e6e6']],
+      prompt('▍'),
     ];
-    lines.forEach(([c1, p, c2, t], i) => {
-      g.fillStyle = c1;
-      g.fillText(p, tx + 22, ty + 66 + i * 28);
-      g.fillStyle = c2;
-      g.fillText(t, tx + 22 + g.measureText(p).width, ty + 66 + i * 28);
+    g.font = font(400, 12.5, MONO);
+    g.textAlign = 'left';
+    lines.forEach((parts, i) => {
+      let lx = (tx + 14) * k;
+      for (const [t, col] of parts) {
+        g.fillStyle = col;
+        g.fillText(t, lx, (ty + 56 + i * 20) * k);
+        lx += g.measureText(t).width;
+      }
     });
 
-    // Projects window.
-    const px = 1030;
-    const py = 200;
-    windowFrame(g, px, py, 460, 300, shortUrl(station.link.url));
-    g.fillStyle = '#f3ecff';
-    g.font = `600 20px ${SANS}`;
-    g.fillText('Pinned projects', px + 24, py + 70);
-    const dots = ['#8be3a1', '#f2c25b', '#f0766a', '#8fa4e8'];
-    station.items.slice(0, 4).forEach((item, i) => {
-      const y = py + 108 + i * 46;
-      g.fillStyle = 'rgba(255,255,255,0.05)';
-      rounded(g, px + 18, y - 24, 424, 38, 8);
-      g.fill();
-      g.fillStyle = dots[i % dots.length];
+    // Dock: Finder, Terminal, VS Code, then the Trash.
+    const size = 52;
+    const dw = 4 * size + 3 * 5 + 14 + 11;
+    const dx = 765 - dw / 2;
+    const dy = 640 - 8 - (size + 12);
+    box(dx, dy, dw, size + 12, 21, 'rgba(40, 32, 60, 0.45)');
+    let ix = dx + 7;
+    [['#74d6ff', '#1668df'], ['#4a4a50', '#1c1c1f'], ['#45b6ff', '#0b5cbd']].forEach(([top, bottom], i) => {
+      const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
+      grad.addColorStop(0, top);
+      grad.addColorStop(1, bottom);
+      box(ix, dy + 6, size, size, 12, grad);
+      const cx = (ix + size / 2) * k;
+      const cy = (dy + 6 + size / 2) * k;
+      g.strokeStyle = '#ffffff';
+      g.fillStyle = '#ffffff';
+      g.lineWidth = 3 * k;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
       g.beginPath();
-      g.arc(px + 36, y - 5, 5, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#ece6f7';
-      g.font = `600 16px ${SANS}`;
-      g.fillText(fit(g, item.title, 140), px + 52, y);
-      g.fillStyle = '#a49dbd';
-      g.font = `15px ${SANS}`;
-      g.fillText(fit(g, item.text, 220), px + 200, y);
+      if (i === 0) {
+        rounded(g, cx - 14 * k, cy - 9 * k, 28 * k, 19 * k, 3 * k);
+        g.fill();
+      } else if (i === 1) {
+        g.moveTo(cx - 12 * k, cy - 8 * k);
+        g.lineTo(cx - 4 * k, cy);
+        g.lineTo(cx - 12 * k, cy + 8 * k);
+        g.moveTo(cx - 1 * k, cy + 9 * k);
+        g.lineTo(cx + 12 * k, cy + 9 * k);
+        g.stroke();
+      } else {
+        g.moveTo(cx - 6 * k, cy - 10 * k);
+        g.lineTo(cx - 15 * k, cy);
+        g.lineTo(cx - 6 * k, cy + 10 * k);
+        g.moveTo(cx + 6 * k, cy - 10 * k);
+        g.lineTo(cx + 15 * k, cy);
+        g.lineTo(cx + 6 * k, cy + 10 * k);
+        g.stroke();
+      }
+      ix += size + 5;
     });
-
-    // Dock.
-    const icons = ['#e9e4f5', '#8be3a1', '#f2c25b', '#8fa4e8', '#f0766a', '#c7a6ff', '#69c9c0'];
-    const dw = icons.length * 46 + 16;
-    g.fillStyle = 'rgba(30, 26, 44, 0.55)';
-    rounded(g, W / 2 - dw / 2, H - 58, dw, 50, 16);
-    g.fill();
-    icons.forEach((col, i) => {
-      g.fillStyle = col;
-      rounded(g, W / 2 - dw / 2 + 12 + i * 46, H - 50, 34, 34, 9);
-      g.fill();
-    });
+    g.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    g.fillRect((ix + 2) * k, (dy + 12) * k, 1 * k, (size - 8) * k);
+    ix += 11;
+    box(ix + 13, dy + 14, size - 26, size - 12, 4, 'rgba(255, 255, 255, 0.45)');
   }
 
   draw();

@@ -22,6 +22,8 @@ const SLATS = { x0: -0.05, x1: 2.65, top: 2.72 };
 const CX = (SLATS.x0 + SLATS.x1) / 2; // centre of the slat wall and the desk
 const SHELVES = [1.66, 2.16]; // top surface of each floating shelf
 const DESK_TOP = 0.76;
+// The monitor's screen: width and height in metres (21:9), and its centre's height above the desk.
+const SCREEN = { w: 1.1, h: 0.46, lift: 0.37 };
 
 const TRIM = '#ecebe8';
 const BRASS = '#b8955a';
@@ -76,19 +78,6 @@ function group(parent, x, y, z, rotY = 0) {
   g.rotation.y = rotY;
   parent.add(g);
   return g;
-}
-
-// Bends a shape around a vertical axis R metres in front of it, like a curved monitor.
-function bend(geometry, R) {
-  const p = geometry.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const a = p.getX(i) / R;
-    const r = R - p.getZ(i);
-    p.setX(i, r * Math.sin(a));
-    p.setZ(i, R - r * Math.cos(a));
-  }
-  geometry.computeVertexNormals();
-  return geometry;
 }
 
 // An upholstered cushion: a rounded box whose faces bulge outwards like stuffing.
@@ -539,21 +528,21 @@ function buildDesk(root, station, profile, noAO) {
   });
   rbox(g, 1.5, 0.05, 0.05, black, 0, DESK_TOP - 0.06, -0.05, 0.006);
 
-  // Curved ultrawide monitor.
-  const R = 1.8;
+  // Flat 21:9 ultrawide monitor. Its screen is flat so the working desktop (a web
+  // page) can sit exactly on it when you use the computer.
   const mon = group(g, 0, DESK_TOP, -0.2);
   rbox(mon, 0.34, 0.01, 0.2, black, 0, 0.005, -0.03, 0.004);
-  rbox(mon, 0.06, 0.3, 0.025, black, 0, 0.16, -0.1, 0.006);
-  const head = group(mon, 0, 0.31, 0);
-  add(head, bend(new THREE.BoxGeometry(1.18, 0.37, 0.03, 64, 1, 1), R), M.paint('#1c1c1f', 0.45), 0, 0, -0.016);
+  rbox(mon, 0.06, SCREEN.lift, 0.025, black, 0, SCREEN.lift / 2 + 0.01, -0.1, 0.006);
+  const head = group(mon, 0, SCREEN.lift, 0);
+  rbox(head, SCREEN.w + 0.03, SCREEN.h + 0.03, 0.03, M.paint('#1c1c1f', 0.45), 0, 0, -0.016, 0.006);
   const desktop = tex.desktopScreen(station, profile);
-  const screen = new THREE.Mesh(bend(new THREE.PlaneGeometry(1.15, 0.34, 64, 1), R), displayMaterial(desktop.texture, 1.5));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), displayMaterial(desktop.texture, 1.5));
   head.add(screen);
   rbox(head, 0.08, 0.1, 0.05, black, 0, 0, -0.05, 0.01);
-  areaLight('#9d8cff', 2.2, 1.12, 0.32, v3(CX, DESK_TOP + 0.31, BACK + 0.21), v3(CX, DESK_TOP + 0.2, 0));
+  areaLight('#9d8cff', 1.7, SCREEN.w - 0.03, SCREEN.h - 0.03, v3(CX, DESK_TOP + SCREEN.lift, BACK + 0.21), v3(CX, DESK_TOP + 0.2, 0));
 
   // Camera clipped on top of the monitor.
-  const cam = group(mon, 0, 0.51, -0.02);
+  const cam = group(mon, 0, SCREEN.lift + SCREEN.h / 2 + 0.03, -0.02);
   rbox(cam, 0.11, 0.065, 0.055, M.paint('#151517', 0.5), 0, 0.03, 0, 0.008);
   const lens = cyl(cam, 0.025, 0.027, 0.045, M.paint('#0c0c0d', 0.3), 0, 0.03, 0.045, 32);
   lens.rotation.x = Math.PI / 2;
@@ -562,12 +551,12 @@ function buildDesk(root, station, profile, noAO) {
   tally.castShadow = false;
   rbox(cam, 0.06, 0.012, 0.06, black, 0, -0.008, -0.01, 0.003);
 
-  // Microphone on a boom arm, clamped to the back edge.
+  // Microphone on a boom arm, clamped to the back edge, left of the screen.
   const mic = M.paint('#141416', 0.45);
-  const a0 = v3(-0.72, DESK_TOP, -0.32);
-  const a1 = v3(-0.72, DESK_TOP + 0.2, -0.32);
-  const a2 = v3(-0.62, DESK_TOP + 0.55, -0.12);
-  const a3 = v3(-0.44, DESK_TOP + 0.36, 0.14);
+  const a0 = v3(-0.8, DESK_TOP, -0.32);
+  const a1 = v3(-0.8, DESK_TOP + 0.2, -0.32);
+  const a2 = v3(-0.76, DESK_TOP + 0.56, -0.1);
+  const a3 = v3(-0.66, DESK_TOP + 0.36, 0.13);
   rbox(g, 0.05, 0.08, 0.06, mic, a0.x, DESK_TOP - 0.02, a0.z, 0.006);
   rod(g, a0, a1, 0.009, mic);
   rod(g, a1, a2, 0.008, mic);
@@ -841,6 +830,15 @@ function buildHitboxes(root) {
   ];
 }
 
+// The monitor's screen (centre and size, in metres), where the working desktop is
+// placed, and where the "Go into the computer" button floats, just under the monitor.
+export const screen = {
+  center: v3(CX, DESK_TOP + SCREEN.lift, BACK + 0.2),
+  width: SCREEN.w,
+  height: SCREEN.h,
+  button: v3(CX, DESK_TOP + 0.06, BACK + 0.36),
+};
+
 // Where you stand and what you look at for each station, and where its marker floats.
 export const home = {
   pos: v3(0, 1.6, 0.6),
@@ -851,7 +849,7 @@ export const views = {
   desk: {
     pos: v3(CX, 1.28, -1.2),
     target: v3(CX, 1.02, BACK),
-    anchor: v3(CX, 1.42, BACK + 0.2),
+    anchor: v3(CX, 1.53, BACK + 0.2),
   },
   shelf: {
     pos: v3(CX, 1.9, -0.8),

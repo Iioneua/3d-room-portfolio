@@ -448,6 +448,47 @@ body:not(.intro) #intro {
   color: var(--faint);
 }
 
+/* "Go into the computer", floating under the monitor */
+#computer-pill {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 9px 18px;
+  border: 1px solid rgba(214, 240, 204, 0.55);
+  border-radius: 999px;
+  background: rgba(150, 197, 134, 0.9);
+  box-shadow: 0 6px 22px rgba(10, 20, 8, 0.35);
+  color: #142110;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, background 0.2s ease;
+}
+
+#computer-pill.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#computer-pill:hover {
+  background: rgba(172, 216, 156, 0.96);
+}
+
+/* At the computer, the name, the places and the round button step aside so the
+   screen has the room; the hint under the screen says how to step back. */
+body.computer .brand,
+body.computer #back {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.focused.computer #hint {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hotspot::after {
     animation: none;
