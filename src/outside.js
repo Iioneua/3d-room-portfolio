@@ -62,10 +62,10 @@ export function buildOutside(scene, room) {
   u.cloudDensity.value = 0.45;
   // The sun disc is thousands of times brighter than anything else in the picture,
   // and the sky itself far brighter than the room. Dim the sky and cap the sun so
-  // the sunset stays visible through the window, as a camera exposed for it would show.
+  // the sunset colours stay visible through the window instead of clipping to white.
   sky.material.fragmentShader = sky.material.fragmentShader.replace(
     'gl_FragColor = vec4( texColor, 1.0 );',
-    'gl_FragColor = vec4( min( texColor * 0.3, vec3( 5.0, 4.2, 3.2 ) ), 1.0 );'
+    'gl_FragColor = vec4( min( texColor * 0.08, vec3( 5.0, 4.2, 3.2 ) ), 1.0 );'
   );
   scene.add(sky);
 

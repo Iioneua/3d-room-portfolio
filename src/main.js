@@ -9,6 +9,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildRoom, views, home } from './room.js';
 import { buildOutside } from './outside.js';
 import { createAmbience } from './audio.js';
+import { loadAssets } from './assets.js';
 import { profile, stations } from './content.js';
 
 const $ = (id) => document.getElementById(id);
@@ -21,7 +22,24 @@ const MAX_PITCH = 0.7;
 const TURN_HOME = 0.9;
 const TURN_FOCUS = 0.8;
 // Camera exposure: lower is darker. The sky outside is far brighter than the room.
-const EXPOSURE = 0.62;
+const EXPOSURE = 0.85;
+
+// ---------- Text on the page ----------
+document.title = `${profile.name} · ${profile.role}`;
+$('brand-name').textContent = profile.name;
+$('brand-role').textContent = profile.role;
+$('intro-role').textContent = profile.role;
+$('intro-title').textContent = `Welcome to ${profile.name}'s room`;
+$('intro-tagline').textContent = profile.tagline;
+document.body.classList.add('intro');
+
+// The room needs its models and textures before it can be built.
+const enter = $('enter');
+enter.disabled = true;
+enter.textContent = 'Setting up the room…';
+const assets = await loadAssets((share) => {
+  enter.textContent = `Setting up the room… ${Math.round(share * 100)}%`;
+});
 
 // ---------- Scene ----------
 // ?quality=high or ?quality=low fixes the quality; otherwise it adapts to the computer.
@@ -36,13 +54,15 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 // Nothing that casts a shadow ever moves, so the shadows are drawn once.
 renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// AgX keeps bright windows and lamps from turning orange or clipping to flat white,
+// the way a camera sensor would.
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = EXPOSURE;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 6000);
 camera.rotation.order = 'YXZ';
-const room = buildRoom(scene, stations, profile);
+const room = buildRoom(scene, assets, stations, profile);
 const outside = buildOutside(scene, room.root);
 
 // Photograph the lit room from its centre and use that picture as ambient light.
@@ -78,7 +98,8 @@ composer.addPass(occlusion);
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.2, 0.7, 1.3));
 composer.addPass(new OutputPass());
 
-// Slight darkening towards the corners and a touch of film grain.
+// A gentle contrast curve and a little extra colour (the tone mapping is soft on its
+// own), slight darkening towards the corners and a touch of film grain.
 const finish = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
   vertexShader: /* glsl */ `
@@ -95,8 +116,12 @@ const finish = new ShaderPass({
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
+      vec3 s = clamp(c.rgb, 0.0, 1.0);
+      c.rgb = mix(s, s * s * (3.0 - 2.0 * s), 0.22);
+      float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb = mix(vec3(luma), c.rgb, 1.1);
       vec2 d = (vUv - 0.5) * vec2(1.0, 0.85);
-      c.rgb *= mix(0.72, 1.0, smoothstep(0.78, 0.22, length(d)));
+      c.rgb *= mix(0.8, 1.0, smoothstep(0.8, 0.25, length(d)));
       c.rgb += (hash(vUv * 900.0 + fract(uTime) * 37.0) - 0.5) * 0.016;
       gl_FragColor = c;
     }
@@ -160,14 +185,7 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-// ---------- Text on the page ----------
-document.title = `${profile.name} · ${profile.role}`;
-$('brand-name').textContent = profile.name;
-$('brand-role').textContent = profile.role;
-$('intro-role').textContent = profile.role;
-$('intro-title').textContent = `Welcome to ${profile.name}'s room`;
-$('intro-tagline').textContent = profile.tagline;
-
+// ---------- Info card ----------
 const card = $('card');
 let cardTimer = null;
 
@@ -329,17 +347,22 @@ soundButton.addEventListener('click', () => {
 });
 
 // ---------- Welcome screen ----------
-document.body.classList.add('intro');
-$('enter').addEventListener('click', () => {
+enter.disabled = false;
+enter.textContent = 'Enter the room';
+enter.addEventListener('click', () => {
   document.body.classList.remove('intro');
   ambience.start();
 });
 
 // ---------- Loop ----------
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+let frames = 0;
 
-function frame() {
-  const time = clock.getElapsedTime();
+function frame(now) {
+  timer.update(now);
+  const time = timer.getElapsed();
+  // Lets automated screenshots know the room has been drawn.
+  if (++frames === 5) window.__ready = true;
   let step = 0;
 
   if (tween) {

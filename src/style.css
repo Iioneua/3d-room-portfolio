@@ -274,9 +274,16 @@ body.intro #hint {
 }
 
 #card-link:hover,
-#enter:hover {
+#enter:hover:not(:disabled) {
   background: #f7c594;
   transform: translateY(-1px);
+}
+
+#enter:disabled {
+  background: rgba(242, 178, 121, 0.35);
+  color: var(--cream);
+  cursor: progress;
+  font-variant-numeric: tabular-nums;
 }
 
 .card-hint {
