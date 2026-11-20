@@ -4,7 +4,7 @@
 .mac {
   --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, Menlo, monospace;
   --sans: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
-  --menubar: 28px;
+  --menubar: 24px;
   --accent: #0a84ff;
   position: fixed;
   top: 0;
@@ -120,10 +120,16 @@
   justify-content: space-between;
   height: var(--menubar);
   padding: 0 8px 0 10px;
-  background: rgba(24, 20, 40, 0.38);
+  background: rgba(24, 20, 40, 0.5);
   backdrop-filter: blur(30px) saturate(1.6);
   color: #fff;
-  font-size: 13px;
+  font-size: 12.5px;
+  transform: translateY(-100%);
+  transition: transform 0.22s ease;
+}
+
+.mac.show-menubar .mac-menubar {
+  transform: none;
 }
 
 .mac-menus,
@@ -134,7 +140,7 @@
 }
 
 .mac-menubar-title {
-  height: 22px;
+  height: 19px;
   padding: 0 9px;
   border: 0;
   border-radius: 5px;
@@ -152,8 +158,8 @@
 }
 
 .mac-menubar-title.is-mark .ic {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
 }
 
 .mac-menubar-title.is-open {
@@ -165,26 +171,26 @@
 }
 
 .mac-status > .ic {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
 
 .mac-status > .mac-battery {
-  width: 25px;
-  height: 13px;
+  width: 22px;
+  height: 11px;
 }
 
 .mac-leave {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 21px;
+  height: 18px;
   margin-right: 4px;
-  padding: 0 11px 0 9px;
+  padding: 0 10px 0 8px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -306,19 +312,24 @@
 /* ---------- Dock ---------- */
 .mac-dock {
   position: absolute;
-  bottom: 8px;
+  bottom: 6px;
   left: 50%;
   z-index: 99999;
   display: flex;
   align-items: flex-end;
-  gap: 5px;
-  padding: 6px 7px 3px;
+  gap: 4px;
+  padding: 5px 6px 2px;
   border: 0.5px solid rgba(255, 255, 255, 0.22);
-  border-radius: 21px;
+  border-radius: 16px;
   background: rgba(40, 32, 60, 0.36);
   backdrop-filter: blur(28px) saturate(1.6);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
   transform: translateX(-50%);
+  transition: transform 0.25s ease;
+}
+
+.mac.has-fullscreen:not(.show-dock) .mac-dock {
+  transform: translate(-50%, calc(100% + 10px));
 }
 
 .mac-dock-item {
@@ -334,15 +345,15 @@
 }
 
 .mac-dock-item .mac-appicon {
-  width: calc(52px * var(--s));
-  height: calc(52px * var(--s));
+  width: calc(40px * var(--s));
+  height: calc(40px * var(--s));
   transition: width 0.1s ease-out, height 0.1s ease-out;
 }
 
 .mac-dock-dot {
-  width: 4px;
-  height: 4px;
-  margin-top: 3px;
+  width: 3px;
+  height: 3px;
+  margin-top: 2px;
   border-radius: 50%;
 }
 
@@ -352,9 +363,9 @@
 
 .mac-dock-tip {
   position: absolute;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 10px);
   left: 50%;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border: 0.5px solid rgba(255, 255, 255, 0.16);
   border-radius: 7px;
   background: rgba(38, 36, 46, 0.86);
@@ -382,10 +393,10 @@
     transform: none;
   }
   28% {
-    transform: translateY(-18px);
+    transform: translateY(-14px);
   }
   76% {
-    transform: translateY(-6px);
+    transform: translateY(-5px);
   }
 }
 
@@ -435,6 +446,12 @@
 .mac-win.is-closing {
   animation: mac-win-out 0.16s ease-in forwards;
   pointer-events: none;
+}
+
+/* Zoomed: the window covers the whole screen, edge to edge. */
+.mac-win.is-zoomed {
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .mac-win.is-zooming {
@@ -700,11 +717,17 @@
 }
 
 /* ---------- Notifications ---------- */
+.mac.show-menubar .mac-toasts {
+  top: calc(var(--menubar) + 10px);
+}
+
+
 .mac-toasts {
   position: absolute;
-  top: calc(var(--menubar) + 10px);
+  top: 10px;
   right: 12px;
   z-index: 100002;
+  transition: top 0.22s ease;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -839,12 +862,17 @@
   backdrop-filter: blur(24px) saturate(1.4);
 }
 
+/* The app sizes itself from the window it is in (a size container): the dial takes
+   whatever height is left after the tabs, buttons and presets, so nothing is ever
+   pushed out of view, from a small window to the full screen. */
 .pomo {
   --phase: #ff8a65;
   --phase-soft: rgba(255, 138, 101, 0.16);
   display: flex;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  container-type: size;
 }
 
 .pomo[data-phase='short'] {
@@ -858,10 +886,16 @@
 }
 
 .pomo-view {
+  /* Height used by everything but the dial (paddings, tabs, text, dots, buttons,
+     presets), and the room the − and + buttons need beside it. */
+  --around-h: 236px;
+  --around-w: 150px;
+  --dial: clamp(96px, min(100cqh - var(--around-h), 100cqw - var(--around-w)), 340px);
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
+  min-height: 0;
   padding: 16px 22px 14px;
 }
 
@@ -896,10 +930,47 @@
   color: var(--phase);
 }
 
+.pomo-dial-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* − and + beside the dial: change the length before the phase starts. */
+.pomo .pomo-step {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0 0 2px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e4e2ea;
+  font-size: 19px;
+  line-height: 1;
+  transition: background 0.15s ease, opacity 0.2s ease;
+}
+
+.pomo .pomo-step:hover:not(:disabled) {
+  background: var(--phase-soft);
+  color: var(--phase);
+}
+
+.pomo .pomo-step:disabled {
+  opacity: 0.3;
+}
+
+.pomo .pomo-step.is-off {
+  visibility: hidden;
+  opacity: 0;
+}
+
 .pomo-dial {
   position: relative;
-  width: 212px;
-  height: 212px;
+  flex: none;
+  width: var(--dial);
+  height: var(--dial);
   margin: 18px 0 8px;
 }
 
@@ -935,14 +1006,14 @@
 
 .pomo-time {
   color: #fff;
-  font: 400 62px/1 'Instrument Serif', Georgia, serif;
+  font: 400 calc(var(--dial) * 0.29) / 1 'Instrument Serif', Georgia, serif;
   font-variant-numeric: tabular-nums;
 }
 
 .pomo-label {
-  margin-top: 6px;
+  margin-top: calc(var(--dial) * 0.028);
   color: var(--phase);
-  font-size: 12px;
+  font-size: clamp(10px, calc(var(--dial) * 0.056), 14px);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1027,6 +1098,70 @@
   outline-offset: 2px;
 }
 
+/* Presets: one click sets the three lengths. */
+.pomo-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.pomo .pomo-preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9c7d1;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pomo-preset small {
+  color: #8f8d97;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomo .pomo-preset:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.pomo .pomo-preset.is-active {
+  border-color: var(--phase);
+  background: var(--phase-soft);
+  color: var(--phase);
+}
+
+.pomo-preset.is-active small {
+  color: var(--phase);
+  opacity: 0.8;
+}
+
+.pomo-custom-gear {
+  display: block;
+  width: 13px;
+  height: 13px;
+  margin-left: -1px;
+}
+
+.pomo-custom-gear svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .pomo-foot {
   display: flex;
   align-items: center;
@@ -1044,24 +1179,10 @@
   line-height: 1.4;
 }
 
-.pomo .pomo-link {
-  flex: none;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #c9c7d1;
-  font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.pomo-link:hover {
-  color: #fff;
-}
-
 .pomo-settings {
   align-items: stretch;
   gap: 10px;
+  overflow-y: auto;
 }
 
 .pomo-settings h3 {
@@ -1080,7 +1201,31 @@
 .pomo-field-input {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+/* − and + around a number in the settings. */
+.pomo .pomo-field-step {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0 0 1px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e4e2ea;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.pomo .pomo-field-step:hover:not(:disabled) {
+  background: var(--phase-soft);
+  color: var(--phase);
+}
+
+.pomo .pomo-field-step:disabled {
+  opacity: 0.3;
 }
 
 .pomo-field-input small {
@@ -1090,15 +1235,16 @@
 }
 
 .pomo-input {
-  width: 62px;
+  width: 46px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.25);
   color: #fff;
   font: inherit;
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
   user-select: text;
 }
 
@@ -1109,27 +1255,35 @@
   color: #dcdae2;
 }
 
-/* A short window (small screen): a smaller dial and tighter spacing. */
-.pomo.is-compact .pomo-view {
-  padding: 10px 20px 10px;
+/* A narrow window: the presets drop their numbers (they stay in the tooltips), so
+   the row keeps to one line. */
+@container (max-width: 470px) {
+  .pomo-preset small {
+    display: none;
+  }
 }
 
-.pomo.is-compact .pomo-dial {
-  width: 158px;
-  height: 158px;
-  margin: 10px 0 4px;
-}
+/* A short window: tighter spacing. */
+@container (max-height: 400px) {
+  .pomo-view {
+    padding: 10px 20px 10px;
+  }
 
-.pomo.is-compact .pomo-time {
-  font-size: 46px;
-}
+  .pomo-dial {
+    margin: 10px 0 4px;
+  }
 
-.pomo.is-compact .pomo-controls {
-  margin-top: 10px;
-}
+  .pomo-controls {
+    margin-top: 10px;
+  }
 
-.pomo.is-compact .pomo-settings {
-  gap: 6px;
+  .pomo-presets {
+    padding-top: 8px;
+  }
+
+  .pomo-settings {
+    gap: 6px;
+  }
 }
 
 .pomo-check input {

@@ -2,7 +2,7 @@
 
 A realistic 3D room at dusk, seen from the middle of the room as if you were standing in it. The computer on the desk is where you focus: pomodoro sessions you can share with friends through a link, with small turn-based games to play together.
 
-**Status:** the room, the computer and a solo pomodoro timer work. Shared sessions and games are next (see [Roadmap](#roadmap)).
+**Status:** the room, the computer and a solo pomodoro timer work. Shared sessions and games are next (see [Roadmap](#roadmap), and [PROGRESS.md](PROGRESS.md) for the decisions so far and the next steps).
 
 ## The room
 
@@ -18,9 +18,9 @@ The desk stands against a wall of wooden slats with two floating shelves lit by 
 
 ## The computer
 
-The green button under the monitor, or a click on the desk, walks you up to it. The camera stops in front of the flat 21:9 monitor with the wall, webcam and desk still around it, and the screen becomes a working desktop drawn exactly on the monitor. It has two apps:
+The green button under the monitor, or a click on the desk, walks you up to it. The camera stops in front of the flat 21:9 monitor with the wall, webcam and desk still around it, and the screen becomes a working desktop drawn exactly on the monitor. Its menu bar hides itself and slides in when the pointer reaches the top edge, and a window's green button makes it fill the whole screen (the dock then waits at the bottom edge). It has two apps:
 
-- **Pomodoro**, which opens on your first visit: focus, then a short break, with a long break after every few focus sessions (25, 5 and 15 minutes, and 4 sessions, by default; all can be changed in its settings). Start, pause (also with Space), reset, skip, or pick a phase by hand.
+- **Pomodoro**, which opens on your first visit: focus, then a short break, with a long break after every few focus sessions. Presets set the rhythm in one click (Classic 25·5, Deep work 50·10, Long focus 90·20), and − and + beside the time lengthen or shorten the current phase before it starts; anything else is "Custom". The Custom button opens the timer settings: the exact lengths, how many sessions come before a long break, auto-start and the chime. Start, pause (also with Space), reset, skip, or pick a phase by hand.
 - **Terminal**: a small zsh-like shell over an in-memory file system, with `ls`, `cd`, `cat`, `tree`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `echo` with `>` and `>>`, tab completion and history. `help` lists everything and `about` shows who I am. Its files reset when the page reloads.
 
 The timer keeps running when you close the app or step back into the room. The monitor seen from the room shows it, the green button under the monitor shows the time left, and so does the tab's title. When a phase ends a soft chime plays (it can be turned off in the timer's settings, and the room's Sound button does not silence it), and if the tab is in the background the browser shows a notification (the page asks once, the first time you press Start). The timer and its settings are kept in the browser, so a reload carries on where it was.

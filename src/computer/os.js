@@ -9,8 +9,12 @@ import { wallpaper as paintWallpaper } from '../textures.js';
 // pixels (about 1530 by 640, the screen's shape) and is moved and scaled every frame
 // to cover the screen exactly as the camera sees it.
 
-const MENUBAR = 28;
-const DOCK_SPACE = 86;
+// The menu bar hides itself and slides in when the pointer reaches the top edge, so
+// windows may use the whole height; the dock keeps its strip at the bottom, except
+// behind a zoomed (full-screen) window, where it also waits at the edge.
+const MENUBAR = 24;
+const DOCK_SPACE = 64;
+const EDGE = 6; // how close to the edge the pointer must come to bring a bar in
 
 export function createOS({ profile, onLeave, onHelp }) {
   const view = { w: 1530, h: 640, x: 0, y: 0, s: 1, base: 1 };
@@ -39,7 +43,41 @@ export function createOS({ profile, onLeave, onHelp }) {
   let spawned = 0;
   let isOn = false;
 
-  const workArea = () => ({ x: 0, y: MENUBAR, w: view.w, h: view.h - MENUBAR - DOCK_SPACE });
+  const workArea = () => ({ x: 0, y: 0, w: view.w, h: view.h - DOCK_SPACE });
+  const fullScreen = () => ({ x: 0, y: 0, w: view.w, h: view.h });
+
+  // ---------- Bars that hide themselves ----------
+  let pointerY = -1; // where the pointer is, in desktop units (-1: not on the desktop)
+  let menubarHold = 0; // a timer that keeps the menu bar in after it was shown
+
+  function updateBars() {
+    const menuOpen = !!openMenu?.button.classList.contains('mac-menubar-title');
+    const nearTop = pointerY >= 0 && pointerY <= (root.classList.contains('show-menubar') ? MENUBAR + 10 : EDGE);
+    root.classList.toggle('show-menubar', menuOpen || nearTop || menubarHold > 0);
+    const full = apps.size && [...apps.values()].some((a) => a.windows.some((w) => w.zoomed && !w.minimized));
+    root.classList.toggle('has-fullscreen', !!full);
+    const nearBottom = pointerY >= 0 && pointerY >= view.h - (root.classList.contains('show-dock') ? DOCK_SPACE + 10 : EDGE);
+    root.classList.toggle('show-dock', !!full && nearBottom);
+  }
+
+  // Shows the menu bar for a moment, so people learn it is there.
+  function peekMenubar(ms = 2600) {
+    clearTimeout(menubarHold);
+    menubarHold = setTimeout(() => {
+      menubarHold = 0;
+      updateBars();
+    }, ms);
+    updateBars();
+  }
+
+  root.addEventListener('pointermove', (e) => {
+    pointerY = toLocal(e.clientX, e.clientY)[1];
+    updateBars();
+  });
+  root.addEventListener('pointerleave', () => {
+    pointerY = -1;
+    updateBars();
+  });
 
   // ---------- Wallpaper ----------
   function drawWallpaper() {
@@ -121,7 +159,7 @@ export function createOS({ profile, onLeave, onHelp }) {
       app,
       el,
       body,
-      rect: { x: clamp(x, 0, area.w - w), y: clamp(y, MENUBAR, area.y + area.h - hgt), w, h: hgt },
+      rect: { x: clamp(x, 0, area.w - w), y: clamp(y, 0, area.y + area.h - hgt), w, h: hgt },
       min: { w: opts.minWidth ?? 380, h: opts.minHeight ?? 240 },
       minimized: false,
       zoomed: null,
@@ -175,14 +213,27 @@ export function createOS({ profile, onLeave, onHelp }) {
     const dir = handle?.dataset.dir || '';
     const start = { px: e.clientX, py: e.clientY, ...win.rect };
     root.classList.add('is-dragging');
-    win.zoomed = null;
+    if (win.zoomed) {
+      // Moving a full-screen window brings it back to its own size, under the pointer;
+      // resizing it simply starts from the full screen.
+      const back = win.zoomed;
+      win.zoomed = null;
+      win.el.classList.remove('is-zoomed');
+      if (!handle) {
+        const [px] = toLocal(e.clientX, e.clientY);
+        Object.assign(win.rect, { w: back.w, h: back.h, x: clamp(px - back.w / 2, 0, view.w - back.w) });
+        Object.assign(start, { x: win.rect.x, y: win.rect.y, w: back.w, h: back.h });
+        apply(win);
+      }
+      updateBars();
+    }
     const move = (ev) => {
       const dx = (ev.clientX - start.px) / view.s;
       const dy = (ev.clientY - start.py) / view.s;
       const r = win.rect;
       if (!handle) {
         r.x = clamp(start.x + dx, 80 - start.w, view.w - 80);
-        r.y = clamp(start.y + dy, MENUBAR, view.h - 50);
+        r.y = clamp(start.y + dy, 0, view.h - 50);
       } else {
         if (dir.includes('e')) r.w = Math.max(win.min.w, start.w + dx);
         if (dir.includes('s')) r.h = Math.max(win.min.h, Math.min(start.h + dy, view.h - start.y));
@@ -191,7 +242,7 @@ export function createOS({ profile, onLeave, onHelp }) {
           r.x = start.x + start.w - r.w;
         }
         if (dir.includes('n')) {
-          r.h = Math.max(win.min.h, start.h - Math.max(dy, MENUBAR - start.y));
+          r.h = Math.max(win.min.h, start.h - Math.max(dy, -start.y));
           r.y = start.y + start.h - r.h;
         }
       }
@@ -207,16 +258,18 @@ export function createOS({ profile, onLeave, onHelp }) {
   }
 
   function toggleZoom(win) {
+    // Zoom fills the whole screen; the menu bar and the dock wait at the edges.
     if (win.zoomed) {
       win.rect = win.zoomed;
       win.zoomed = null;
     } else {
       win.zoomed = { ...win.rect };
-      const a = workArea();
-      win.rect = { x: a.x + 6, y: a.y + 6, w: a.w - 12, h: a.h - 6 };
+      win.rect = fullScreen();
     }
+    win.el.classList.toggle('is-zoomed', !!win.zoomed);
     animate(win.el, 'is-zooming', 260);
     apply(win);
+    updateBars();
   }
 
   function dockIconOf(app) {
@@ -241,6 +294,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     await new Promise((r) => setTimeout(r, 380));
     if (win.minimized) win.el.hidden = true;
     renderDock();
+    updateBars();
   }
 
   function restore(win) {
@@ -258,6 +312,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     setTimeout(() => win.el.classList.remove('is-minimising'), 380);
     focusWindow(win);
     renderDock();
+    updateBars();
   }
 
   async function closeWindow(win) {
@@ -270,6 +325,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     win.el.remove();
     win.onClose?.();
     renderDock();
+    updateBars();
   }
 
   // ---------- Size and position on the monitor ----------
@@ -286,11 +342,11 @@ export function createOS({ profile, onLeave, onHelp }) {
       for (const app of apps.values()) {
         for (const win of app.windows) {
           const r = win.rect;
-          if (win.zoomed) Object.assign(r, { x: a.x + 6, y: a.y + 6, w: a.w - 12, h: a.h - 6 });
+          if (win.zoomed) Object.assign(r, fullScreen());
           r.w = Math.min(r.w, a.w);
-          r.h = Math.min(r.h, view.h - MENUBAR);
+          r.h = Math.min(r.h, view.h);
           r.x = clamp(r.x, 80 - r.w, view.w - 80);
-          r.y = clamp(r.y, MENUBAR, Math.max(MENUBAR, view.h - 50));
+          r.y = clamp(r.y, 0, Math.max(0, view.h - 50));
           apply(win);
         }
       }
@@ -368,6 +424,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     overlay.replaceChildren();
     openMenu?.button.classList.remove('is-open');
     openMenu = null;
+    updateBars();
   }
 
   function showMenu(button, getMenu) {
@@ -381,6 +438,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     overlay.append(list);
     button.classList.add('is-open');
     openMenu = { button, list };
+    updateBars();
   }
 
   // A right-click menu at the pointer.
@@ -392,7 +450,7 @@ export function createOS({ profile, onLeave, onHelp }) {
     overlay.append(list);
     const [x, y] = toLocal(event.clientX, event.clientY);
     list.style.left = `${Math.max(4, Math.min(x, view.w - list.offsetWidth - 6))}px`;
-    list.style.top = `${Math.max(MENUBAR, Math.min(y, view.h - list.offsetHeight - 6))}px`;
+    list.style.top = `${Math.max(4, Math.min(y, view.h - list.offsetHeight - 6))}px`;
     openMenu = { button: h('span'), list };
   }
 
@@ -630,9 +688,11 @@ export function createOS({ profile, onLeave, onHelp }) {
       root.removeAttribute('aria-hidden');
       root.classList.add('is-on');
       renderMenubar();
+      peekMenubar();
     },
     hide() {
       isOn = false;
+      pointerY = -1;
       closeMenus();
       clearInterval(clockTimer);
       root.setAttribute('aria-hidden', 'true');

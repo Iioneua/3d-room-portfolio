@@ -262,29 +262,6 @@ export function desktopScreen(pomodoro) {
     const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     g.drawImage(base, 0, 0);
 
-    // Menu bar, with the sun-and-peaks mark.
-    g.fillStyle = 'rgba(24, 20, 40, 0.45)';
-    g.fillRect(0, 0, W, 28 * k);
-    g.fillStyle = '#ffffff';
-    g.beginPath();
-    g.arc(25 * k, 10 * k, 2.6 * k, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.moveTo(11 * k, 21 * k);
-    g.lineTo(17 * k, 11.5 * k);
-    g.lineTo(20.5 * k, 16.5 * k);
-    g.lineTo(22.6 * k, 13.7 * k);
-    g.lineTo(28 * k, 21 * k);
-    g.closePath();
-    g.fill();
-    let mx = 44;
-    for (const [i, m] of ['Pomodoro', 'Timer', 'Window', 'Help'].entries()) {
-      text(m, mx, 19, '#ffffff', font(i ? 400 : 700, 13));
-      mx += g.measureText(m).width / k + 18;
-    }
-    const day = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
-    text(`${day}  ${time}`, 1516, 19, '#ffffff', font(400, 13), 'right');
-
     // Clock on the desktop.
     text(time, 765, 118, 'rgba(255, 255, 255, 0.92)', font(400, 76, SERIF), 'center');
     text(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), 765, 146, 'rgba(255, 255, 255, 0.72)', font(500, 14), 'center');
@@ -350,40 +327,42 @@ export function desktopScreen(pomodoro) {
     box(765 - 64, wy + 324, 128, 40, 20, accent);
     text(pomodoro.running ? 'Pause' : pomodoro.started ? 'Resume' : 'Start', 765, wy + 349, '#1b1520', font(600, 15), 'center');
 
-    // Dock: Pomodoro, then the Terminal.
-    const size = 52;
-    const dw = 2 * size + 5 + 14;
+    // Dock: Pomodoro, then the Terminal (40-unit icons, as on the real desktop).
+    const size = 40;
+    const u = size / 52; // the glyphs were drawn for 52-unit icons
+    const dw = 2 * size + 4 + 12;
     const dx = 765 - dw / 2;
-    const dy = 640 - 8 - (size + 12);
-    box(dx, dy, dw, size + 12, 21, 'rgba(40, 32, 60, 0.45)');
+    const dy = 640 - 6 - (size + 10);
+    box(dx, dy, dw, size + 10, 16, 'rgba(40, 32, 60, 0.45)');
     const tile = (ix, top, bottom) => {
-      const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
+      const grad = g.createLinearGradient(0, (dy + 5) * k, 0, (dy + 5 + size) * k);
       grad.addColorStop(0, top);
       grad.addColorStop(1, bottom);
-      box(ix, dy + 6, size, size, 12, grad);
-      return [(ix + size / 2) * k, (dy + 6 + size / 2) * k];
+      box(ix, dy + 5, size, size, 9, grad);
+      return [(ix + size / 2) * k, (dy + 5 + size / 2) * k];
     };
+    const q = (v) => v * u * k;
     g.strokeStyle = '#ffffff';
-    g.lineWidth = 3 * k;
+    g.lineWidth = q(3);
     g.lineCap = 'round';
     g.lineJoin = 'round';
     // Pomodoro: a stopwatch.
-    const [px, py] = tile(dx + 7, '#ffa477', '#c9452e');
+    const [px, py] = tile(dx + 6, '#ffa477', '#c9452e');
     g.beginPath();
-    g.arc(px, py + 2 * k, 12 * k, 0, Math.PI * 2);
-    g.moveTo(px, py + 2 * k);
-    g.lineTo(px, py - 5 * k);
-    g.moveTo(px - 3 * k, py - 15 * k);
-    g.lineTo(px + 3 * k, py - 15 * k);
+    g.arc(px, py + q(2), q(12), 0, Math.PI * 2);
+    g.moveTo(px, py + q(2));
+    g.lineTo(px, py - q(5));
+    g.moveTo(px - q(3), py - q(15));
+    g.lineTo(px + q(3), py - q(15));
     g.stroke();
     // Terminal: a prompt.
-    const [qx, qy] = tile(dx + 7 + size + 5, '#4a4a50', '#1c1c1f');
+    const [tx, ty] = tile(dx + 6 + size + 4, '#4a4a50', '#1c1c1f');
     g.beginPath();
-    g.moveTo(qx - 12 * k, qy - 8 * k);
-    g.lineTo(qx - 4 * k, qy);
-    g.lineTo(qx - 12 * k, qy + 8 * k);
-    g.moveTo(qx - 1 * k, qy + 9 * k);
-    g.lineTo(qx + 12 * k, qy + 9 * k);
+    g.moveTo(tx - q(12), ty - q(8));
+    g.lineTo(tx - q(4), ty);
+    g.lineTo(tx - q(12), ty + q(8));
+    g.moveTo(tx - q(1), ty + q(9));
+    g.lineTo(tx + q(12), ty + q(9));
     g.stroke();
   }
 

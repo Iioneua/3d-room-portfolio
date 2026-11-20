@@ -21,7 +21,18 @@ export const DEFAULT_SETTINGS = {
   sound: true, // chime when a phase ends
 };
 
-const SETTINGS_KEY = 'dusk-desk.pomodoro.settings';
+// Ready-made rhythms; anything else counts as "Custom".
+export const PRESETS = [
+  { id: 'classic', label: 'Classic', focus: 25, short: 5, long: 15 },
+  { id: 'deep', label: 'Deep work', focus: 50, short: 10, long: 30 },
+  { id: 'long', label: 'Long focus', focus: 90, short: 20, long: 30 },
+];
+
+// The − and + buttons on the timer change a length by this much (in minutes).
+export const STEP = { focus: 5, short: 1, long: 5 };
+export const LIMITS = { focus: [5, 180], short: [1, 60], long: [5, 90] };
+
+const SETTINGS_KEY ='dusk-desk.pomodoro.settings';
 const STATE_KEY = 'dusk-desk.pomodoro.state';
 
 // Browser storage can be missing or blocked (private windows, previews); the timer
@@ -153,6 +164,29 @@ export function createPomodoro() {
     },
     get settings() {
       return { ...settings };
+    },
+    // The preset the lengths match, or null for a custom rhythm.
+    get preset() {
+      return PRESETS.find((p) => p.focus === settings.focus && p.short === settings.short && p.long === settings.long) || null;
+    },
+    // Can the current phase's length still be changed with − and +? (Not once it has started.)
+    get adjustable() {
+      return !api.started;
+    },
+    usePreset(id) {
+      const p = PRESETS.find((x) => x.id === id);
+      if (p) api.setSettings({ focus: p.focus, short: p.short, long: p.long });
+    },
+    // Lengthens (+1) or shortens (-1) the current phase by one step, before it starts.
+    adjust(direction) {
+      if (api.started) return;
+      const key = PHASES[state.phase].setting;
+      const step = STEP[key];
+      const [lo, hi] = LIMITS[key];
+      // Snap to the step first, so 23 goes to 25 or 20 rather than 28 or 18.
+      const now = settings[key];
+      const next = direction > 0 ? Math.floor(now / step) * step + step : Math.ceil(now / step) * step - step;
+      api.setSettings({ [key]: Math.min(hi, Math.max(lo, next)) });
     },
     remaining(now = Date.now()) {
       return state.endsAt !== null ? Math.max(0, state.endsAt - now) : state.left;

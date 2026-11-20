@@ -1,5 +1,5 @@
 import { h } from './dom.js';
-import { PHASES, formatTime } from '../pomodoro.js';
+import { PHASES, PRESETS, STEP, LIMITS, formatTime } from '../pomodoro.js';
 
 // The Pomodoro app: the face of the timer in src/pomodoro.js. The timer itself lives
 // outside the computer, so it keeps running when the window is closed or you step
@@ -67,6 +67,12 @@ export function createPomodoroApp(ctx) {
     const time = h('span', { class: 'pomo-time', role: 'timer', 'aria-live': 'off' });
     const label = h('span', { class: 'pomo-label' });
     const dial = h('div', { class: 'pomo-dial' }, progress, h('div', { class: 'pomo-readout' }, time, label));
+    // − and + change the length of the current phase, until it starts.
+    const stepper = (direction, text) =>
+      h('button', { type: 'button', class: 'pomo-step', 'data-step': direction, text, onclick: () => pomodoro.adjust(direction) });
+    const minus = stepper(-1, '−');
+    const plus = stepper(1, '+');
+    const dialRow = h('div', { class: 'pomo-dial-row' }, minus, dial, plus);
 
     const dots = h('div', { class: 'pomo-dots', 'aria-hidden': 'true' });
     const round = h('p', { class: 'pomo-round' });
@@ -78,15 +84,56 @@ export function createPomodoroApp(ctx) {
       html: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3l7 5-7 5z"/><path d="M12.5 3v10"/></svg>' });
     const controls = h('div', { class: 'pomo-controls' }, reset, main, skip);
 
-    const gear = h('button', { type: 'button', class: 'pomo-link', text: 'Settings', onclick: () => showSettings(true) });
-    const note = h('p', { class: 'pomo-note', text: 'Keeps running when you step back from the computer.' });
-    const timerView = h('div', { class: 'pomo-view' }, tabs, dial, round, dots, controls, h('div', { class: 'pomo-foot' }, note, gear));
+    // Presets: one click sets all three lengths. "Custom" lights up for anything else.
+    const presetButtons = PRESETS.map((p) =>
+      h('button', { type: 'button', class: 'pomo-preset', 'data-preset': p.id, title: `${p.focus} min focus, ${p.short} min break, ${p.long} min long break`, onclick: () => pomodoro.usePreset(p.id) },
+        h('span', { text: p.label }), h('small', { text: `${p.focus}·${p.short}` }))
+    );
+    // "Custom" lights up for your own lengths, and opens the timer settings.
+    const custom = h('button', { type: 'button', class: 'pomo-preset pomo-custom', 'data-preset': 'custom', onclick: () => showSettings(true) },
+      h('span', { class: 'pomo-custom-gear', 'aria-hidden': 'true',
+        html: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.8M8 12.4v1.8M1.8 8h1.8M12.4 8h1.8M3.6 3.6l1.3 1.3M11.1 11.1l1.3 1.3M3.6 12.4l1.3-1.3M11.1 4.9l1.3-1.3"/></svg>' }),
+      h('span', { text: 'Custom' }));
+    const presets = h('div', { class: 'pomo-presets', role: 'group', 'aria-label': 'Presets' }, presetButtons, custom);
+    const timerView = h('div', { class: 'pomo-view' }, tabs, dialRow, round, dots, controls, presets);
 
     // ---------- Settings ----------
+    // A number with − and + on either side (steps of 5 minutes for focus and long
+    // breaks, 1 for the rest); it can also be typed, or changed with ↑ and ↓.
+    const fields = [];
     const number = (key, text, max) => {
-      const input = h('input', { type: 'number', min: key === 'longEvery' ? 2 : 1, max, step: 1, class: 'pomo-input', 'data-key': key });
-      input.addEventListener('change', () => pomodoro.setSettings({ [key]: input.value }));
-      return h('label', { class: 'pomo-field' }, h('span', { text }), h('span', { class: 'pomo-field-input' }, input, h('small', { text: key === 'longEvery' ? 'focus sessions' : 'min' })));
+      const min = key === 'longEvery' ? 2 : 1;
+      const step = STEP[key] || 1;
+      const input = h('input', { type: 'text', inputmode: 'numeric', class: 'pomo-input', 'data-key': key, 'aria-label': text });
+      const less = h('button', { type: 'button', class: 'pomo-field-step', 'aria-label': `Less ${text.toLowerCase()}`, text: '−' });
+      const more = h('button', { type: 'button', class: 'pomo-field-step', 'aria-label': `More ${text.toLowerCase()}`, text: '+' });
+      const sync = () => {
+        const v = pomodoro.settings[key];
+        input.value = v;
+        less.disabled = v <= min;
+        more.disabled = v >= max;
+      };
+      const set = (value) => {
+        const n = Math.round(Number(value));
+        if (Number.isFinite(n)) pomodoro.setSettings({ [key]: Math.min(max, Math.max(min, n)) });
+        sync();
+      };
+      const nudge = (dir) => {
+        const now = pomodoro.settings[key];
+        set(dir > 0 ? Math.floor(now / step) * step + step : Math.ceil(now / step) * step - step);
+      };
+      less.addEventListener('click', () => nudge(-1));
+      more.addEventListener('click', () => nudge(1));
+      input.addEventListener('change', () => set(input.value));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        set(pomodoro.settings[key] + (e.key === 'ArrowUp' ? 1 : -1));
+      });
+      fields.push(sync);
+      return h('div', { class: 'pomo-field' }, h('span', { text }),
+        h('span', { class: 'pomo-field-input' }, less, input, more, h('small', { text: key === 'longEvery' ? 'focus sessions' : 'min' })));
     };
     const check = (key, text) => {
       const input = h('input', { type: 'checkbox', 'data-key': key });
@@ -103,6 +150,7 @@ export function createPomodoroApp(ctx) {
       check('autoStart', 'Start the next phase by itself'),
       check('sound', 'Play a chime when a phase ends'),
       notifyNote,
+      h('p', { class: 'pomo-note', text: 'The timer keeps running when you close this window or step back from the computer.' }),
       h('div', { class: 'pomo-foot' }, h('span'), h('button', { type: 'button', class: 'mac-button', text: 'Done', onclick: () => showSettings(false) }))
     );
 
@@ -113,10 +161,8 @@ export function createPomodoroApp(ctx) {
       settingsView.hidden = !on;
       if (on) {
         const s = pomodoro.settings;
-        for (const input of settingsView.querySelectorAll('[data-key]')) {
-          if (input.type === 'checkbox') input.checked = s[input.dataset.key];
-          else input.value = s[input.dataset.key];
-        }
+        fields.forEach((sync) => sync());
+        for (const input of settingsView.querySelectorAll('input[type="checkbox"]')) input.checked = s[input.dataset.key];
         const perm = 'Notification' in window ? Notification.permission : 'unsupported';
         notifyNote.textContent = {
           granted: 'When this tab is in the background, a notification tells you a phase has ended.',
@@ -143,6 +189,18 @@ export function createPomodoroApp(ctx) {
       label.textContent = pomodoro.running ? pomodoro.label : pomodoro.started ? 'Paused' : pomodoro.label;
       main.textContent = pomodoro.running ? 'Pause' : pomodoro.started ? 'Resume' : 'Start';
       reset.disabled = !pomodoro.started;
+      // − and + only before the phase starts, and not past the limits.
+      const s = pomodoro.settings;
+      const key = PHASES[pomodoro.phase].setting;
+      // Hidden (but keeping their place) once the phase has started.
+      for (const b of [minus, plus]) b.classList.toggle('is-off', !pomodoro.adjustable);
+      minus.disabled = s[key] <= LIMITS[key][0];
+      plus.disabled = s[key] >= LIMITS[key][1];
+      minus.title = `${STEP[key]} min shorter`;
+      plus.title = `${STEP[key]} min longer`;
+      const active = pomodoro.preset?.id || 'custom';
+      for (const b of presets.querySelectorAll('.pomo-preset')) b.classList.toggle('is-active', b.dataset.preset === active);
+      custom.title = active === 'custom' ? `Your own lengths: ${s.focus} min focus, ${s.short} min break, ${s.long} min long break` : 'Set your own lengths, and other timer settings';
       for (const tab of tabs.children) {
         const on = tab.dataset.phase === pomodoro.phase;
         tab.classList.toggle('is-active', on);
@@ -166,13 +224,10 @@ export function createPomodoroApp(ctx) {
       os.restore(win);
       return view;
     }
-    win = os.openWindow(app, { title: 'Pomodoro', width: 430, height: 470, minWidth: 380, minHeight: 360, className: 'pomo-win' });
+    win = os.openWindow(app, { title: 'Pomodoro', width: 480, height: 470, minWidth: 440, minHeight: 360, className: 'pomo-win' });
     view = build();
     win.body.append(view.el);
     view.render();
-    // On a small screen the window is shorter: a smaller dial keeps everything in view.
-    const fit = new ResizeObserver(() => view.el.classList.toggle('is-compact', win.body.clientHeight < 430));
-    fit.observe(win.body);
     const stopChange = pomodoro.on('change', () => {
       view.render();
       os.refreshMenubar();
@@ -184,7 +239,6 @@ export function createPomodoroApp(ctx) {
       toggle();
     });
     win.onClose = () => {
-      fit.disconnect();
       stopChange();
       clearInterval(tick);
       win = null;
