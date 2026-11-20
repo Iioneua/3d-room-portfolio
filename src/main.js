@@ -10,7 +10,7 @@ import { buildRoom, views, home, screen } from './room.js';
 import { buildOutside } from './outside.js';
 import { createAmbience } from './audio.js';
 import { loadAssets } from './assets.js';
-import { profile, stations, projects } from './content.js';
+import { profile, site, stations } from './content.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -25,12 +25,12 @@ const TURN_FOCUS = 0.8;
 const EXPOSURE = 0.9;
 
 // ---------- Text on the page ----------
-document.title = `${profile.name} · ${profile.role}`;
+document.title = site.name;
 $('brand-name').textContent = profile.name;
 $('brand-tagline').textContent = profile.tagline;
-$('intro-role').textContent = profile.role;
+$('intro-role').textContent = site.name;
 $('intro-title').textContent = `Welcome to ${profile.name}'s room`;
-$('intro-tagline').textContent = profile.tagline;
+$('intro-tagline').textContent = site.tagline;
 document.body.classList.add('intro');
 
 // Text drawn onto the screens and the plaque needs the web fonts, so wait for them
@@ -73,7 +73,7 @@ renderer.toneMappingExposure = EXPOSURE;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 6000);
 camera.rotation.order = 'YXZ';
-const room = buildRoom(scene, assets, stations, profile);
+const room = buildRoom(scene, assets, profile);
 const outside = buildOutside(scene);
 
 // Photograph the lit room from its centre and use that picture as ambient light.
@@ -254,6 +254,18 @@ function focus(id, instant = false) {
   }
 }
 
+// Stand at the desk, facing the monitor. The desk has no info card: it is the computer.
+function standAtDesk(instant = false) {
+  current = 'desk';
+  markPill(null);
+  document.body.classList.add('focused');
+  card.classList.remove('open');
+  clearTimeout(cardTimer);
+  const p = pose(views.desk, FOCUS_FOV);
+  if (instant) jumpTo(p);
+  else walkTo(p);
+}
+
 function back() {
   if (!current) return;
   current = null;
@@ -294,7 +306,7 @@ for (const id of Object.keys(stations)) {
 }
 
 const labelLayer = $('labels');
-const labels = Object.keys(views).map((id) => {
+const labels = Object.keys(stations).map((id) => {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'hotspot';
@@ -395,7 +407,7 @@ async function enterComputer(instant = false) {
   if (inComputer) return;
   inComputer = true;
   current = 'desk';
-  markPill('desk');
+  markPill(null);
   clearTimeout(cardTimer);
   card.classList.remove('open');
   hint.textContent = COMPUTER_HINT;
@@ -405,7 +417,7 @@ async function enterComputer(instant = false) {
   else walkTo(pose, 1.4, true);
   const [mod] = await Promise.all([loadComputer(), wait(instant ? 0 : 950)]);
   if (!inComputer) return;
-  computer ??= mod.createComputer({ profile, projects, stations, onLeave: leaveComputer });
+  computer ??= mod.createComputer({ profile, stations, onLeave: leaveComputer });
   sizeComputer();
   showingComputer = true;
   trackScreen();
@@ -423,7 +435,7 @@ function leaveComputer() {
     showingComputer = false;
     hint.textContent = ROOM_HINT;
   }, 500);
-  focus('desk');
+  standAtDesk();
 }
 
 pill.addEventListener('click', () => enterComputer());
@@ -483,7 +495,7 @@ canvas.addEventListener('pointerup', (event) => {
     return;
   }
   const id = pick(event);
-  if (id === 'desk' && current === 'desk') enterComputer();
+  if (id === 'desk') enterComputer();
   else if (id && id === current) openLink(id);
   else if (id) focus(id);
   else back();
@@ -608,7 +620,8 @@ jumpTo(pose(home, HOME_FOV));
 const startView = params.get('view');
 if (startView) {
   document.body.classList.remove('intro');
-  if (views[startView]) focus(startView, true);
+  if (startView === 'desk') standAtDesk(true);
+  else if (stations[startView]) focus(startView, true);
   if (startView === 'computer') enterComputer(true);
   turnBy(THREE.MathUtils.degToRad(Number(params.get('turn')) || 0));
 }

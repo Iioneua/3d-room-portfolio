@@ -1,10 +1,7 @@
 import { h } from './dom.js';
-import { HOME, USER, FSError, normalize, pretty, basename, dirname, join, extname } from './fs.js';
-import { PROJECTS } from './seed.js';
-import { runScript } from './node.js';
+import { HOME, USER, FSError, normalize, pretty, basename, dirname } from './fs.js';
 
-// A zsh-like shell over the computer's file system. Used by the Terminal app and by
-// the terminal panel inside VS Code.
+// A zsh-like shell over the computer's in-memory file system, for the Terminal app.
 
 const HISTORY = []; // shared by every terminal window, like zsh's shared history
 const STARTED = Date.now();
@@ -18,17 +15,14 @@ const HELP = [
   ['echo <text>', 'print text; add > file to write it to a file'],
   ['touch / mkdir', 'make an empty file / a folder'],
   ['cp / mv / rm', 'copy, move or rename, and delete'],
-  ['node <file.js>', 'run a JavaScript file (or node -e "code")'],
-  ['code [path]', 'open a file or folder in VS Code'],
-  ['open <path>', 'open a folder in Finder or a file in VS Code'],
-  ['projects', 'list my projects'],
+  ['open <link>', 'open a link in a new tab'],
   ['about', 'who I am and where to find me'],
   ['neofetch', 'information about this computer'],
   ['history / clear', 'earlier commands / clear the screen'],
   ['exit', 'close this terminal'],
 ];
 
-class UsageError extends Error {}
+class UsageError extends Error { }
 
 function plain(parts) {
   return [].concat(parts).map((p) => (typeof p === 'string' ? p : p.text)).join('');
@@ -57,7 +51,6 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
   const host = `${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-room`;
   let dir = fs.isDir(cwd) ? cwd : HOME;
   let prevDir = dir;
-  let running = null;
   let histIndex = HISTORY.length;
   let draft = '';
   let closed = false;
@@ -97,7 +90,7 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
 
   function showPrompt() {
     promptEl.replaceChildren(...promptParts().map((p) => (typeof p === 'string' ? p : h('span', { class: p.cls, text: p.text }))));
-    lineEl.hidden = !!running;
+    lineEl.hidden = false;
     el.scrollTop = el.scrollHeight;
   }
 
@@ -128,7 +121,7 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
       io.out([{ text: 'Commands you can use here:', cls: 't-bold' }]);
       for (const [cmd, text] of HELP) io.out([{ text: cmd.padEnd(20), cls: 't-accent' }, text]);
       io.out('');
-      io.out([{ text: 'Tab completes names, ↑ and ↓ bring back earlier commands, Ctrl+C stops a running program.', cls: 't-dim' }]);
+      io.out([{ text: 'Tab completes names, and ↑ and ↓ bring back earlier commands.', cls: 't-dim' }]);
     },
 
     ls(args, io) {
@@ -287,72 +280,9 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
 
     open(args) {
       const target = args[0];
-      if (!target) throw new UsageError('usage: open <file, folder or link>');
-      if (/^(https?:|mailto:)/.test(target)) {
-        window.open(target, '_blank', 'noopener');
-        return;
-      }
-      const path = resolve(target);
-      if (!fs.exists(path)) throw new UsageError(`The file ${pretty(path)} does not exist.`);
-      ctx.openPath(path);
-    },
-
-    code(args) {
-      if (!args.length) {
-        ctx.openCode({ folder: dir });
-        return;
-      }
-      const path = resolve(args[0]);
-      if (fs.isDir(path)) ctx.openCode({ folder: path });
-      else {
-        if (!fs.exists(path)) fs.write(path, '');
-        ctx.openCode({ file: path });
-      }
-    },
-
-    node(args, io) {
-      if (args[0] === '-v' || args[0] === '--version') {
-        io.out('v22.11.0');
-        return;
-      }
-      let code;
-      let file;
-      if (args[0] === '-e' || args[0] === '--eval' || args[0] === '-p') {
-        if (args[1] == null) throw new UsageError(`${args[0]} needs some code, for example: node -e "console.log(1 + 1)"`);
-        code = args[0] === '-p' ? `console.log(${args[1]})` : args[1];
-        file = join(dir, '[eval]');
-      } else if (args[0]) {
-        file = resolve(args[0]);
-        if (!fs.exists(file)) throw new UsageError(`Cannot find module '${file}'`);
-        if (fs.isDir(file)) throw new UsageError(`${args[0]} is a folder; give it a .js file`);
-        if (!['js', 'mjs', 'cjs'].includes(extname(file))) throw new UsageError(`only JavaScript files can run here (${basename(file)} is not one)`);
-        code = fs.read(file);
-      } else {
-        io.out('Give node a file to run, for example: node hello.js');
-        io.out([{ text: 'There is one in ~/Documents. Try: cd ~/Documents && node hello.js', cls: 't-dim' }]);
-        return;
-      }
-      return new Promise((done) => {
-        running = runScript({
-          code,
-          file,
-          cwd: dir,
-          args: args.slice(1),
-          env: { HOME, USER, PWD: dir, SHELL: '/bin/zsh' },
-          onOut: (text) => io.out(text),
-          onErr: (text) => io.err(text),
-          onDone: (exitCode) => {
-            running = null;
-            done(exitCode);
-          },
-        });
-        setTitle();
-        showPrompt();
-      });
-    },
-
-    python: () => {
-      throw new UsageError('this computer only runs JavaScript. Try node.');
+      if (!target) throw new UsageError('usage: open <link>');
+      if (!/^(https?:|mailto:)/.test(target)) throw new UsageError(`only links open here (to read a file, try: cat ${quoteArg(target)})`);
+      window.open(target, '_blank', 'noopener');
     },
 
     clear() {
@@ -397,7 +327,6 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
         [{ text: 'Host: ', cls: 't-accent' }, `the ultrawide on ${profile.name}'s desk`],
         [{ text: 'Owner: ', cls: 't-accent' }, `${profile.name}, ${profile.role}`],
         [{ text: 'Shell: ', cls: 't-accent' }, 'zsh (mostly)'],
-        [{ text: 'Projects: ', cls: 't-accent' }, String(ctx.projects.length)],
         [{ text: 'Uptime: ', cls: 't-accent' }, `${minutes} min${minutes === 1 ? '' : 's'}`],
       ];
       for (let i = 0; i < Math.max(art.length, info.length); i++) {
@@ -405,15 +334,6 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
       }
       const colours = ['#3b3b40', '#f0766a', '#8be3a1', '#f2c25b', '#7fb6ff', '#d59cf5', '#69c9c0', '#e6e6e6'];
       io.out([' '.repeat(25), ...colours.map((c) => ({ text: '   ', cls: 't-swatch', style: { background: c } }))]);
-    },
-
-    projects(_, io) {
-      for (const p of ctx.projects) {
-        io.out([{ text: p.name.padEnd(16), cls: 't-dir' }, p.description, { text: ` · ${p.stack.join(', ')}`, cls: 't-dim' }]);
-        if (p.link) io.out([' '.repeat(16), { text: shortLink(p.link), href: p.link, cls: 't-link' }]);
-      }
-      io.out('');
-      io.out([{ text: `Look inside one: cd ${pretty(PROJECTS)}/${ctx.projects[0]?.name ?? ''} && ls`, cls: 't-dim' }]);
     },
 
     about(_, io) {
@@ -440,14 +360,7 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
       onExit?.();
     },
   };
-  commands.python3 = commands.python;
   commands.ll = (args, io) => commands.ls(['-la', ...args], io);
-  for (const editor of ['vim', 'vi', 'nano', 'emacs']) {
-    commands[editor] = (args, io) => {
-      io.out([{ text: `${editor} isn't installed here, so the file opens in VS Code instead.`, cls: 't-dim' }]);
-      return commands.code(args, io);
-    };
-  }
 
   // ---------- Parsing and running ----------
   function tokenize(line) {
@@ -669,24 +582,14 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
     }
   });
 
-  el.addEventListener('keydown', (e) => {
-    if (running && e.ctrlKey && e.key.toLowerCase() === 'c' && !window.getSelection().toString()) {
-      e.preventDefault();
-      row({ text: '^C', cls: 't-dim' });
-      running.stop();
-    }
-  });
-
   el.addEventListener('mouseup', () => {
-    if (window.getSelection().toString()) return;
-    if (running) el.focus();
-    else input.focus();
+    if (!window.getSelection().toString()) input.focus();
   });
 
   // ---------- Title: "guest — -zsh — 80×24" ----------
   let size = '80×24';
   function setTitle() {
-    onTitle?.(`${USER} — ${running ? 'node' : '-zsh'} — ${size}`);
+    onTitle?.(`${USER} — -zsh — ${size}`);
   }
   const probe = h('span', { class: 'term-probe', text: 'MMMMMMMMMM' });
   el.append(probe);
@@ -708,20 +611,12 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
 
   return {
     el,
-    focus: () => (running ? el.focus() : input.focus()),
+    focus: () => input.focus(),
     get cwd() {
       return dir;
     },
-    get busy() {
-      return !!running;
-    },
     // Types a command and runs it, as if someone had entered it.
     async type(line) {
-      if (running) {
-        row({ text: '^C', cls: 't-dim' });
-        running.stop();
-        await new Promise((r) => setTimeout(r, 0));
-      }
       input.value = '';
       await submit(line);
     },
@@ -733,11 +628,8 @@ export function createTerminal(ctx, { cwd = HOME, onExit, onTitle, banner = true
       }
     },
     dispose() {
-      running?.stop();
       observer.disconnect();
       closed = true;
     },
   };
 }
-
-export { quoteArg };

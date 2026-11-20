@@ -3,7 +3,7 @@ import { glyphs, systemMark, small } from './icons.js';
 import { wallpaper as paintWallpaper } from '../textures.js';
 
 // The desktop: wallpaper, menu bar, dock, windows, menus, notifications and dialogs.
-// Apps (Finder, Terminal, VS Code) register themselves and open windows through it.
+// Apps (for now the Terminal) register themselves and open windows through it.
 //
 // The desktop sits on the monitor's screen in the room. It has its own size in CSS
 // pixels (about 1530 by 640, the screen's shape) and is moved and scaled every frame
@@ -14,7 +14,6 @@ const DOCK_SPACE = 86;
 
 export function createOS({ profile, onLeave, onHelp }) {
   const view = { w: 1530, h: 640, x: 0, y: 0, s: 1, base: 1 };
-  const layoutListeners = new Set();
   const toLocal = (cx, cy) => [(cx - view.x) / view.s, (cy - view.y) / view.s];
 
   const root = h('div', { class: 'mac', 'aria-hidden': 'true', style: { width: `${view.w}px`, height: `${view.h}px` } });
@@ -32,6 +31,9 @@ export function createOS({ profile, onLeave, onHelp }) {
   document.body.append(root);
 
   const apps = new Map();
+  // Owns the windows that belong to no app in the dock, such as About This Computer.
+  const system = { id: 'system', name: 'System', inDock: false, windows: [] };
+  apps.set(system.id, system);
   let active = null;
   let zTop = 10;
   let spawned = 0;
@@ -292,7 +294,6 @@ export function createOS({ profile, onLeave, onHelp }) {
           apply(win);
         }
       }
-      layoutListeners.forEach((fn) => fn());
     }
     if (isOn) drawWallpaper();
   }
@@ -432,7 +433,7 @@ export function createOS({ profile, onLeave, onHelp }) {
   // The menus of the app in front. Built again each time a menu opens, so items are
   // greyed out (or ticked) according to what is going on right now.
   function menuDefs() {
-    const app = active?.app || apps.get('finder');
+    const app = active?.app || [...apps.values()].find((a) => a.inDock !== false);
     if (!app) return [];
     return [
       {
@@ -493,8 +494,6 @@ export function createOS({ profile, onLeave, onHelp }) {
   }
 
   // ---------- Dock ----------
-  let trash = { full: false, open: null };
-
   function renderDock() {
     const items = [...apps.values()].filter((a) => a.inDock !== false).map((app) => {
       const item = h('button', { type: 'button', class: 'mac-dock-item', 'data-app': app.id, 'aria-label': app.name },
@@ -505,13 +504,7 @@ export function createOS({ profile, onLeave, onHelp }) {
       item.addEventListener('click', () => dockClick(app, item));
       return item;
     });
-    const trashItem = h('button', { type: 'button', class: 'mac-dock-item', 'data-app': 'trash', 'aria-label': 'Trash' },
-      h('span', { class: 'mac-dock-tip', text: 'Trash' }),
-      h('span', { class: 'mac-appicon mac-appicon-trash', html: trash.full ? glyphs.trashFull : glyphs.trash }),
-      h('span', { class: 'mac-dock-dot' })
-    );
-    trashItem.addEventListener('click', () => trash.open?.());
-    dock.replaceChildren(...items, h('span', { class: 'mac-dock-sep' }), trashItem);
+    dock.replaceChildren(...items);
   }
 
   function dockClick(app, item) {
@@ -544,53 +537,20 @@ export function createOS({ profile, onLeave, onHelp }) {
     for (const item of dock.querySelectorAll('.mac-dock-item')) item.style.setProperty('--s', 1);
   });
 
-  // ---------- Desktop icons ----------
-  let selectedIcon = null;
-  function setDesktopItems(items) {
-    const perColumn = Math.max(1, Math.floor((view.h - MENUBAR - DOCK_SPACE - 20) / 104));
-    desktop.replaceChildren(
-      ...items.map((item, i) => {
-        const el = h('button', { type: 'button', class: 'mac-desk-icon', title: item.name },
-          h('span', { class: 'mac-desk-glyph', html: item.glyph }),
-          h('span', { class: 'mac-desk-label', text: item.name })
-        );
-        el.style.right = `${18 + Math.floor(i / perColumn) * 96}px`;
-        el.style.top = `${MENUBAR + 14 + (i % perColumn) * 104}px`;
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          selectedIcon?.classList.remove('is-selected');
-          selectedIcon = el;
-          el.classList.add('is-selected');
-        });
-        el.addEventListener('dblclick', () => item.open());
-        el.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') item.open();
-        });
-        el.addEventListener('contextmenu', (e) => {
-          el.click();
-          contextMenu(e, item.menu?.() || [{ label: 'Open', action: item.open }]);
-        });
-        return el;
-      })
-    );
-  }
-
+  // ---------- Desktop ----------
   let desktopMenu = null;
   desktop.addEventListener('pointerdown', (e) => {
-    if (e.target !== desktop) return;
-    selectedIcon?.classList.remove('is-selected');
-    selectedIcon = null;
-    focusWindow(null);
+    if (e.target === desktop) focusWindow(null);
   });
   desktop.addEventListener('contextmenu', (e) => {
     if (e.target === desktop && desktopMenu) contextMenu(e, desktopMenu());
   });
   root.addEventListener('contextmenu', (e) => {
-    if (!e.defaultPrevented && !e.target.closest('input, textarea, .cm-editor, .term, .finder-preview')) e.preventDefault();
+    if (!e.defaultPrevented && !e.target.closest('input, textarea, .term')) e.preventDefault();
   });
 
   // ---------- Notifications ----------
-  function notify({ title, body, app = 'finder', timeout = 9000, onClick }) {
+  function notify({ title, body, app = 'system', timeout = 9000, onClick }) {
     const close = h('button', { type: 'button', class: 'mac-toast-close', 'aria-label': 'Dismiss', html: small.close });
     const toast = h('div', { class: 'mac-toast', role: 'status' },
       h('span', { class: `mac-appicon mac-appicon-${app}`, html: glyphs[app] || '' }),
@@ -618,7 +578,7 @@ export function createOS({ profile, onLeave, onHelp }) {
   let aboutWin = null;
   function about() {
     if (aboutWin?.el.isConnected) return aboutWin.focus();
-    aboutWin = openWindow(apps.get('finder'), { title: 'About This Computer', width: 340, height: 400, minWidth: 340, minHeight: 400, className: 'mac-about' });
+    aboutWin = openWindow(system, { title: 'About This Computer', width: 340, height: 400, minWidth: 340, minHeight: 400, className: 'mac-about' });
     aboutWin.body.append(
       h('span', { class: 'mac-about-mark', html: systemMark }),
       h('h2', { text: `${profile.name}'s computer` }),
@@ -626,7 +586,7 @@ export function createOS({ profile, onLeave, onHelp }) {
       h('dl', {},
         h('dt', { text: 'Display' }), h('dd', { text: 'Ultrawide, on the desk' }),
         h('dt', { text: 'Memory' }), h('dd', { text: 'Resets when you reload' }),
-        h('dt', { text: 'Built with' }), h('dd', { text: 'Three.js and CodeMirror' })
+        h('dt', { text: 'Built with' }), h('dd', { text: 'Three.js' })
       ),
       h('button', { type: 'button', class: 'mac-button', text: 'Step back', onclick: () => onLeave() })
     );
@@ -651,16 +611,10 @@ export function createOS({ profile, onLeave, onHelp }) {
     restore,
     notify,
     contextMenu,
-    setDesktopItems,
     setDesktopMenu: (fn) => (desktopMenu = fn),
-    setTrash(state) {
-      trash = { ...trash, ...state };
-      renderDock();
-    },
     refreshMenubar: renderMenubar,
     setSize,
     track,
-    onLayout: (fn) => layoutListeners.add(fn),
     get active() {
       return active;
     },

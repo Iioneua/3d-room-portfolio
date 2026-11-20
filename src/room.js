@@ -516,7 +516,7 @@ function keyboard(parent, x, y, z) {
   return k;
 }
 
-function buildDesk(root, station, profile, noAO) {
+function buildDesk(root, profile, noAO) {
   const g = group(root, CX, 0, BACK + 0.4);
   const black = M.paint('#19191b', 0.4);
   const alu = M.metal('#b9b8b6', 0.3);
@@ -535,7 +535,7 @@ function buildDesk(root, station, profile, noAO) {
   rbox(mon, 0.06, SCREEN.lift, 0.025, black, 0, SCREEN.lift / 2 + 0.01, -0.1, 0.006);
   const head = group(mon, 0, SCREEN.lift, 0);
   rbox(head, SCREEN.w + 0.03, SCREEN.h + 0.03, 0.03, M.paint('#1c1c1f', 0.45), 0, 0, -0.016, 0.006);
-  const desktop = tex.desktopScreen(station, profile);
+  const desktop = tex.desktopScreen(profile);
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), displayMaterial(desktop.texture, 1.5));
   head.add(screen);
   rbox(head, 0.08, 0.1, 0.05, black, 0, 0, -0.05, 0.01);
@@ -839,7 +839,8 @@ export const screen = {
   button: v3(CX, DESK_TOP + 0.06, BACK + 0.36),
 };
 
-// Where you stand and what you look at for each station, and where its marker floats.
+// Where you stand and what you look at for each place, and where its marker floats
+// (the desk has none: the "Go into the computer" button stands in for it).
 export const home = {
   pos: v3(0, 1.6, 0.6),
   target: v3(0.15, 1.38, BACK),
@@ -849,7 +850,6 @@ export const views = {
   desk: {
     pos: v3(CX, 1.28, -1.2),
     target: v3(CX, 1.02, BACK),
-    anchor: v3(CX, 1.53, BACK + 0.2),
   },
   shelf: {
     pos: v3(CX, 1.9, -0.8),
@@ -868,7 +868,7 @@ export const views = {
   },
 };
 
-export function buildRoom(scene, assets, stations, profile) {
+export function buildRoom(scene, assets, profile) {
   A = assets;
   M = createMaterials(assets);
   LIGHTS = scene;
@@ -879,7 +879,7 @@ export function buildRoom(scene, assets, stations, profile) {
   buildShell(root);
   buildWindow(root, noAO);
   buildSlatWall(root, noAO);
-  const desktop = buildDesk(root, stations.desk, profile, noAO);
+  const desktop = buildDesk(root, profile, noAO);
   buildPlaque(root, profile);
   buildRightSide(root);
   buildLeftSide(root);

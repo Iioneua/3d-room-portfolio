@@ -42,13 +42,6 @@ function rounded(g, x, y, w, h, r) {
   g.roundRect(x, y, w, h, r);
 }
 
-function fit(g, text, maxWidth) {
-  if (g.measureText(text).width <= maxWidth) return text;
-  let s = text;
-  while (s.length > 1 && g.measureText(s + '…').width > maxWidth) s = s.slice(0, -1);
-  return s + '…';
-}
-
 // Smooth 1D noise for mountain ridges.
 function ridgeNoise(seed) {
   const r = rng(seed);
@@ -228,9 +221,9 @@ export function wallpaper(g, w, h) {
 }
 
 // What the monitor shows when nobody is using it: the same desktop you get when you
-// go into the computer (menu bar, clock, Finder on Projects, a terminal and the dock).
+// go into the computer (menu bar, clock, a Terminal with the welcome text and the dock).
 // It is drawn in the desktop's own units (about 1530 by 640) and scaled to the canvas.
-export function desktopScreen(station, profile) {
+export function desktopScreen(profile) {
   const W = 2048;
   const H = 856;
   const k = W / 1530;
@@ -239,7 +232,6 @@ export function desktopScreen(station, profile) {
   const base = canvas(W, H);
   wallpaper(base.getContext('2d'), W, H);
   const host = `${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-room`;
-  const names = station.items.slice(0, 4).map((item) => item.title);
 
   const font = (weight, size, family = SANS) => `${weight} ${size * k}px ${family}`;
   const text = (t, x, y, color, f, align = 'left') => {
@@ -260,10 +252,6 @@ export function desktopScreen(station, profile) {
       g.arc((x + i * 20) * k, y * k, 6 * k, 0, Math.PI * 2);
       g.fill();
     });
-  const folder = (x, y, s) => {
-    box(x + s * 0.06, y + s * 0.16, s * 0.88, s * 0.66, s * 0.06, '#4c9fe0');
-    box(x + s * 0.06, y + s * 0.3, s * 0.88, s * 0.52, s * 0.06, '#78bdf3');
-  };
 
   function draw() {
     const now = new Date();
@@ -286,7 +274,7 @@ export function desktopScreen(station, profile) {
     g.closePath();
     g.fill();
     let mx = 44;
-    for (const [i, m] of ['Finder', 'File', 'Edit', 'View', 'Go', 'Window', 'Help'].entries()) {
+    for (const [i, m] of ['Terminal', 'Shell', 'Window', 'Help'].entries()) {
       text(m, mx, 19, '#ffffff', font(i ? 400 : 700, 13));
       mx += g.measureText(m).width / k + 18;
     }
@@ -297,46 +285,11 @@ export function desktopScreen(station, profile) {
     text(time, 765, 118, 'rgba(255, 255, 255, 0.92)', font(400, 76, SERIF), 'center');
     text(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), 765, 146, 'rgba(255, 255, 255, 0.72)', font(500, 14), 'center');
 
-    // Desktop icons, top right.
-    folder(1427, 40, 64);
-    text('Projects', 1459, 118, '#ffffff', font(500, 12), 'center');
-    box(1441, 136, 36, 46, 4, '#fdfdfd');
-    text('Welcome.md', 1459, 198, '#ffffff', font(500, 12), 'center');
-
-    // Finder on the Projects folder.
-    const fx = 150;
-    const fy = 180;
-    const fw = 620;
-    const fh = 330;
-    box(fx, fy, fw, fh, 11, '#1e1e20');
-    g.save();
-    rounded(g, fx * k, fy * k, fw * k, fh * k, 11 * k);
-    g.clip();
-    g.fillStyle = 'rgba(52, 46, 66, 0.96)';
-    g.fillRect(fx * k, fy * k, 150 * k, fh * k);
-    g.fillStyle = '#262628';
-    g.fillRect((fx + 150) * k, fy * k, (fw - 150) * k, 46 * k);
-    g.restore();
-    lights(fx + 20, fy + 22);
-    text('Favourites', fx + 16, fy + 62, 'rgba(255, 255, 255, 0.42)', font(600, 10.5));
-    ['Projects', 'Desktop', 'Documents', 'Downloads'].forEach((place, i) => {
-      if (!i) box(fx + 8, fy + 70, 134, 24, 6, 'rgba(255, 255, 255, 0.12)');
-      box(fx + 18, fy + 77 + i * 26, 12, 10, 2, '#3d9bff');
-      text(place, fx + 38, fy + 87 + i * 26, '#e8e8ea', font(400, 12.5));
-    });
-    text('Projects', fx + 175, fy + 29, '#ececee', font(700, 14.5));
-    names.forEach((name, i) => {
-      const ix = fx + 172 + i * 108;
-      folder(ix + 18, fy + 66, 64);
-      g.font = font(400, 12);
-      text(fit(g, name, 100 * k), ix + 50, fy + 152, '#e4e4e7', font(400, 12), 'center');
-    });
-
-    // Terminal.
-    const tx = 820;
-    const ty = 236;
-    const tw = 570;
-    const th = 270;
+    // Terminal, showing the welcome text.
+    const tw = 640;
+    const th = 290;
+    const tx = 765 - tw / 2;
+    const ty = 200;
     box(tx, ty, tw, th, 11, 'rgba(26, 26, 30, 0.95)');
     g.save();
     rounded(g, tx * k, ty * k, tw * k, th * k, 11 * k);
@@ -347,12 +300,16 @@ export function desktopScreen(station, profile) {
     lights(tx + 20, ty + 15);
     text('guest — -zsh — 80×24', tx + tw / 2, ty + 20, '#dadadd', font(600, 12), 'center');
     const prompt = (cmd) => [[`guest@${host}`, '#8be3a1'], [' ~ ', '#7fb6ff'], [`% ${cmd}`, '#e6e6e6']];
+    const say = (t) => [[t, '#e6e6e6']];
     const lines = [
-      prompt('ls Projects'),
-      [[names.join('   '), '#7fb6ff']],
-      prompt('node Documents/hello.js'),
-      [['Hello, visitor!', '#e6e6e6']],
-      [['Squares: [ 1, 4, 9, 16, 25 ]', '#e6e6e6']],
+      prompt('cat ~/welcome.txt'),
+      say('Welcome to my computer.'),
+      say(''),
+      say('Soon this is where you will run focus sessions (pomodoro) with your friends,'),
+      say('and play a few small games together on your breaks.'),
+      say(''),
+      say('For now the Terminal works: type help to see what it can do.'),
+      say(''),
       prompt('▍'),
     ];
     g.font = font(400, 12.5, MONO);
@@ -361,56 +318,35 @@ export function desktopScreen(station, profile) {
       let lx = (tx + 14) * k;
       for (const [t, col] of parts) {
         g.fillStyle = col;
-        g.fillText(t, lx, (ty + 56 + i * 20) * k);
+        g.fillText(t, lx, (ty + 56 + i * 22) * k);
         lx += g.measureText(t).width;
       }
     });
 
-    // Dock: Finder, Terminal, VS Code, then the Trash.
+    // Dock: the Terminal.
     const size = 52;
-    const dw = 4 * size + 3 * 5 + 14 + 11;
+    const dw = size + 14;
     const dx = 765 - dw / 2;
     const dy = 640 - 8 - (size + 12);
     box(dx, dy, dw, size + 12, 21, 'rgba(40, 32, 60, 0.45)');
-    let ix = dx + 7;
-    [['#74d6ff', '#1668df'], ['#4a4a50', '#1c1c1f'], ['#45b6ff', '#0b5cbd']].forEach(([top, bottom], i) => {
-      const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
-      grad.addColorStop(0, top);
-      grad.addColorStop(1, bottom);
-      box(ix, dy + 6, size, size, 12, grad);
-      const cx = (ix + size / 2) * k;
-      const cy = (dy + 6 + size / 2) * k;
-      g.strokeStyle = '#ffffff';
-      g.fillStyle = '#ffffff';
-      g.lineWidth = 3 * k;
-      g.lineCap = 'round';
-      g.lineJoin = 'round';
-      g.beginPath();
-      if (i === 0) {
-        rounded(g, cx - 14 * k, cy - 9 * k, 28 * k, 19 * k, 3 * k);
-        g.fill();
-      } else if (i === 1) {
-        g.moveTo(cx - 12 * k, cy - 8 * k);
-        g.lineTo(cx - 4 * k, cy);
-        g.lineTo(cx - 12 * k, cy + 8 * k);
-        g.moveTo(cx - 1 * k, cy + 9 * k);
-        g.lineTo(cx + 12 * k, cy + 9 * k);
-        g.stroke();
-      } else {
-        g.moveTo(cx - 6 * k, cy - 10 * k);
-        g.lineTo(cx - 15 * k, cy);
-        g.lineTo(cx - 6 * k, cy + 10 * k);
-        g.moveTo(cx + 6 * k, cy - 10 * k);
-        g.lineTo(cx + 15 * k, cy);
-        g.lineTo(cx + 6 * k, cy + 10 * k);
-        g.stroke();
-      }
-      ix += size + 5;
-    });
-    g.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    g.fillRect((ix + 2) * k, (dy + 12) * k, 1 * k, (size - 8) * k);
-    ix += 11;
-    box(ix + 13, dy + 14, size - 26, size - 12, 4, 'rgba(255, 255, 255, 0.45)');
+    const ix = dx + 7;
+    const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
+    grad.addColorStop(0, '#4a4a50');
+    grad.addColorStop(1, '#1c1c1f');
+    box(ix, dy + 6, size, size, 12, grad);
+    const cx = (ix + size / 2) * k;
+    const cy = (dy + 6 + size / 2) * k;
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 3 * k;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(cx - 12 * k, cy - 8 * k);
+    g.lineTo(cx - 4 * k, cy);
+    g.lineTo(cx - 12 * k, cy + 8 * k);
+    g.moveTo(cx - 1 * k, cy + 9 * k);
+    g.lineTo(cx + 12 * k, cy + 9 * k);
+    g.stroke();
   }
 
   draw();

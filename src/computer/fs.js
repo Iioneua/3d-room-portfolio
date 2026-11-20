@@ -1,9 +1,8 @@
-// A small in-memory file system shared by Finder, the terminal and the code editor.
+// A small in-memory file system for the computer's Terminal.
 // Paths are written the Unix way. Nothing is saved: a reload starts fresh.
 
 export const USER = 'guest';
 export const HOME = `/Users/${USER}`;
-export const TRASH = `${HOME}/.Trash`;
 
 export class FSError extends Error {}
 
@@ -37,7 +36,7 @@ export function pretty(p) {
   return p;
 }
 
-export const isInside = (path, dir) => path === dir || path.startsWith(dir === '/' ? '/' : `${dir}/`);
+const isInside =(path, dir) => path === dir || path.startsWith(dir === '/' ? '/' : `${dir}/`);
 
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
 
@@ -225,34 +224,4 @@ export function createFS() {
     },
   };
   return fs;
-}
-
-// Readable file kinds and sizes, the way Finder shows them.
-const KINDS = {
-  js: 'JavaScript',
-  mjs: 'JavaScript',
-  cjs: 'JavaScript',
-  jsx: 'JavaScript JSX',
-  ts: 'TypeScript',
-  tsx: 'TypeScript JSX',
-  json: 'JSON',
-  md: 'Markdown Document',
-  html: 'HTML text',
-  css: 'CSS',
-  py: 'Python script',
-  txt: 'Plain Text',
-};
-
-export const kindOf = (path, type) => (type === 'dir' ? 'Folder' : KINDS[extname(path)] || 'Document');
-
-export function formatSize(bytes) {
-  if (bytes < 1000) return `${bytes} bytes`;
-  return `${(bytes / 1000).toFixed(bytes < 10000 ? 1 : 0)} KB`;
-}
-
-export function formatDate(ms) {
-  const d = new Date(ms);
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === new Date().toDateString()) return `Today at ${time}`;
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} at ${time}`;
 }
