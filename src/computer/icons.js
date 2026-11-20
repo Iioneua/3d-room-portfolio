@@ -11,6 +11,12 @@ export const systemMark = svg(
 );
 
 export const glyphs = {
+  // A stopwatch with its hand at a quarter past.
+  pomodoro: svg(
+    '<circle cx="32" cy="35" r="16" fill="none" stroke="#fff" stroke-width="3.6"/>' +
+      '<path d="M28 13.5h8M32 13.5V19M45 22l2.6-2.6" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>' +
+      '<path d="M32 35V26.5M32 35l6 3.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>'
+  ),
   terminal: svg(
     '<path d="M18 23l9 8-9 8" stroke="#f2f2f2" stroke-width="3.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path d="M31 41h14" stroke="#f2f2f2" stroke-width="3.6" stroke-linecap="round"/>'

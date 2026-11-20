@@ -63,7 +63,7 @@
 }
 
 .mac-widget-date {
-  margin-top: 6px !important;
+  margin-top: 6px;
   font-size: 14px;
   font-weight: 500;
   opacity: 0.72;
@@ -98,7 +98,7 @@
 
 .mac.is-dragging,
 .mac.is-dragging * {
-  user-select: none !important;
+  user-select: none;
 }
 
 .mac-wallpaper {
@@ -292,6 +292,10 @@
 .mac-appicon-terminal {
   background: linear-gradient(180deg, #4a4a50 0%, #1c1c1f 100%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 0 0 1.5px rgba(255, 255, 255, 0.14);
+}
+
+.mac-appicon-pomodoro {
+  background: linear-gradient(180deg, #ffa477 0%, #ef6a45 55%, #c9452e 100%);
 }
 
 /* Windows that belong to no app in the dock, such as About This Computer. */
@@ -827,6 +831,312 @@
   margin: 0;
   color: #a5a5aa;
   text-align: left;
+}
+
+/* ---------- Pomodoro ---------- */
+.pomo-win {
+  background: rgba(30, 28, 38, 0.92);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+
+.pomo {
+  --phase: #ff8a65;
+  --phase-soft: rgba(255, 138, 101, 0.16);
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.pomo[data-phase='short'] {
+  --phase: #5ec4b6;
+  --phase-soft: rgba(94, 196, 182, 0.16);
+}
+
+.pomo[data-phase='long'] {
+  --phase: #a594ff;
+  --phase-soft: rgba(165, 148, 255, 0.16);
+}
+
+.pomo-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 22px 14px;
+}
+
+.pomo-view[hidden] {
+  display: none;
+}
+
+.pomo-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.pomo .pomo-tab {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #b4b2bd;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pomo-tab:hover {
+  color: #fff;
+}
+
+.pomo .pomo-tab.is-active {
+  background: var(--phase-soft);
+  color: var(--phase);
+}
+
+.pomo-dial {
+  position: relative;
+  width: 212px;
+  height: 212px;
+  margin: 18px 0 8px;
+}
+
+.pomo-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pomo-ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+
+.pomo-ring-track {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.pomo-ring-fill {
+  stroke: var(--phase);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+}
+
+.pomo-readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pomo-time {
+  color: #fff;
+  font: 400 62px/1 'Instrument Serif', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomo-label {
+  margin-top: 6px;
+  color: var(--phase);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pomo-round {
+  margin: 4px 0 7px;
+  color: #a5a3ad;
+  font-size: 12px;
+}
+
+.pomo-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.pomo-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pomo-dots span.is-done {
+  background: var(--phase);
+}
+
+.pomo-dots span.is-now {
+  box-shadow: inset 0 0 0 1.5px var(--phase);
+}
+
+.pomo-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.pomo .pomo-main {
+  min-width: 128px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--phase);
+  color: #1b1520;
+  font-size: 15px;
+  font-weight: 600;
+  transition: filter 0.15s ease;
+}
+
+.pomo-main:hover {
+  filter: brightness(1.08);
+}
+
+.pomo .pomo-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8d6de;
+}
+
+.pomo-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pomo-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pomo-icon-btn:disabled {
+  opacity: 0.35;
+}
+
+.pomo button:focus-visible,
+.pomo input:focus-visible {
+  outline: 2px solid var(--phase);
+  outline-offset: 2px;
+}
+
+.pomo-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.pomo-note {
+  margin: 0;
+  color: #85838d;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.pomo .pomo-link {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #c9c7d1;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pomo-link:hover {
+  color: #fff;
+}
+
+.pomo-settings {
+  align-items: stretch;
+  gap: 10px;
+}
+
+.pomo-settings h3 {
+  margin: 2px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pomo-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #dcdae2;
+}
+
+.pomo-field-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pomo-field-input small {
+  width: 86px;
+  color: #8f8d97;
+  font-size: 12px;
+}
+
+.pomo-input {
+  width: 62px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font: inherit;
+  text-align: right;
+  user-select: text;
+}
+
+.pomo-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #dcdae2;
+}
+
+/* A short window (small screen): a smaller dial and tighter spacing. */
+.pomo.is-compact .pomo-view {
+  padding: 10px 20px 10px;
+}
+
+.pomo.is-compact .pomo-dial {
+  width: 158px;
+  height: 158px;
+  margin: 10px 0 4px;
+}
+
+.pomo.is-compact .pomo-time {
+  font-size: 46px;
+}
+
+.pomo.is-compact .pomo-controls {
+  margin-top: 10px;
+}
+
+.pomo.is-compact .pomo-settings {
+  gap: 6px;
+}
+
+.pomo-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--phase);
 }
 
 /* ---------- Terminal ---------- */

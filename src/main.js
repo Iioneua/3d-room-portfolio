@@ -8,7 +8,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildRoom, views, home, screen } from './room.js';
 import { buildOutside } from './outside.js';
-import { createAmbience } from './audio.js';
+import { createAmbience, createChime } from './audio.js';
+import { createPomodoro, formatTime } from './pomodoro.js';
 import { loadAssets } from './assets.js';
 import { profile, site, stations } from './content.js';
 
@@ -25,13 +26,58 @@ const TURN_FOCUS = 0.8;
 const EXPOSURE = 0.9;
 
 // ---------- Text on the page ----------
-document.title = site.name;
 $('brand-name').textContent = profile.name;
 $('brand-tagline').textContent = profile.tagline;
 $('intro-role').textContent = site.name;
 $('intro-title').textContent = `Welcome to ${profile.name}'s room`;
 $('intro-tagline').textContent = site.tagline;
 document.body.classList.add('intro');
+
+// ---------- Pomodoro ----------
+// The timer lives here, outside the computer, so it keeps running wherever you are.
+// The computer's Pomodoro app, the monitor in the room, the green button and the
+// tab's title all show it.
+const pomodoro = createPomodoro();
+const chime = createChime();
+
+// Called from the click on Start: the page may now play sound, and asks once
+// whether it may show a notification when a phase ends in a background tab.
+function primeAlerts() {
+  chime.prime();
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+}
+
+pomodoro.on('end', ({ finished, next }) => {
+  const toBreak = next !== 'focus';
+  if (pomodoro.settings.sound) chime.play(toBreak);
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    const note = new Notification(finished === 'focus' ? 'Focus session done' : 'Break is over', {
+      body: toBreak ? `Time for a ${pomodoro.label.toLowerCase()}.` : 'Back to focus.',
+      tag: 'dusk-desk-timer',
+    });
+    note.onclick = () => {
+      window.focus();
+      note.close();
+    };
+  }
+});
+
+// The tab's title and the green button under the monitor show the time left.
+function showTimer() {
+  const time = formatTime(pomodoro.remaining());
+  const state = pomodoro.running ? pomodoro.label : 'Paused';
+  const focus = pomodoro.phase === 'focus';
+  if (pomodoro.started) {
+    document.title = `${time} · ${state} · ${site.name}`;
+    $('computer-pill').textContent = `${state} · ${time}`;
+  } else {
+    document.title = focus ? site.name : `${pomodoro.label} · ${site.name}`;
+    $('computer-pill').textContent = focus ? 'Start a focus session' : `Start your ${pomodoro.label.toLowerCase()}`;
+  }
+}
+pomodoro.on('change', showTimer);
+setInterval(showTimer, 1000);
+showTimer();
 
 // Text drawn onto the screens and the plaque needs the web fonts, so wait for them
 // (but never more than a few seconds).
@@ -73,7 +119,7 @@ renderer.toneMappingExposure = EXPOSURE;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.05, 6000);
 camera.rotation.order = 'YXZ';
-const room = buildRoom(scene, assets, profile);
+const room = buildRoom(scene, assets, profile, pomodoro);
 const outside = buildOutside(scene);
 
 // Photograph the lit room from its centre and use that picture as ambient light.
@@ -333,7 +379,7 @@ function placeLabels() {
     const y = (-projected.y * 0.5 + 0.5) * h;
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
   }
-  // The "Go into the computer" button, under the monitor, from the middle of the room or the desk.
+  // The green button under the monitor (it goes into the computer), from the middle of the room or the desk.
   const showPill = !inComputer && !tween && (current === null || current === 'desk') && !document.body.classList.contains('intro');
   pill.classList.toggle('show', showPill);
   if (showPill) {
@@ -417,7 +463,7 @@ async function enterComputer(instant = false) {
   else walkTo(pose, 1.4, true);
   const [mod] = await Promise.all([loadComputer(), wait(instant ? 0 : 950)]);
   if (!inComputer) return;
-  computer ??= mod.createComputer({ profile, stations, onLeave: leaveComputer });
+  computer ??= mod.createComputer({ profile, stations, pomodoro, onUserStart: primeAlerts, onLeave: leaveComputer });
   sizeComputer();
   showingComputer = true;
   trackScreen();
@@ -525,6 +571,7 @@ enter.textContent = 'Enter the room';
 enter.addEventListener('click', () => {
   document.body.classList.remove('intro');
   ambience.start();
+  chime.prime();
   // Fetch the computer's code in the background so going in is instant.
   setTimeout(loadComputer, 2500);
 });

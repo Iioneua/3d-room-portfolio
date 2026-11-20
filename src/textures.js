@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PHASES, formatTime } from './pomodoro.js';
 
 // Everything that appears printed or displayed on an object (screens, the plaque,
 // prints) is drawn here on a canvas, from the data in content.js.
@@ -220,10 +221,14 @@ export function wallpaper(g, w, h) {
   }
 }
 
+// The same colours as the Pomodoro app (computer.css).
+const PHASE_COLOURS = { focus: '#ff8a65', short: '#5ec4b6', long: '#a594ff' };
+
 // What the monitor shows when nobody is using it: the same desktop you get when you
-// go into the computer (menu bar, clock, a Terminal with the welcome text and the dock).
+// go into the computer (menu bar, clock, the Pomodoro app with the live timer, and the
+// dock), so you can follow the timer from across the room.
 // It is drawn in the desktop's own units (about 1530 by 640) and scaled to the canvas.
-export function desktopScreen(profile) {
+export function desktopScreen(pomodoro) {
   const W = 2048;
   const H = 856;
   const k = W / 1530;
@@ -231,7 +236,6 @@ export function desktopScreen(profile) {
   const g = c.getContext('2d');
   const base = canvas(W, H);
   wallpaper(base.getContext('2d'), W, H);
-  const host = `${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-room`;
 
   const font = (weight, size, family = SANS) => `${weight} ${size * k}px ${family}`;
   const text = (t, x, y, color, f, align = 'left') => {
@@ -274,7 +278,7 @@ export function desktopScreen(profile) {
     g.closePath();
     g.fill();
     let mx = 44;
-    for (const [i, m] of ['Terminal', 'Shell', 'Window', 'Help'].entries()) {
+    for (const [i, m] of ['Pomodoro', 'Timer', 'Window', 'Help'].entries()) {
       text(m, mx, 19, '#ffffff', font(i ? 400 : 700, 13));
       mx += g.measureText(m).width / k + 18;
     }
@@ -285,80 +289,119 @@ export function desktopScreen(profile) {
     text(time, 765, 118, 'rgba(255, 255, 255, 0.92)', font(400, 76, SERIF), 'center');
     text(now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), 765, 146, 'rgba(255, 255, 255, 0.72)', font(500, 14), 'center');
 
-    // Terminal, showing the welcome text.
-    const tw = 640;
-    const th = 290;
-    const tx = 765 - tw / 2;
-    const ty = 200;
-    box(tx, ty, tw, th, 11, 'rgba(26, 26, 30, 0.95)');
+    // The Pomodoro window, with the live timer.
+    const left = pomodoro.remaining();
+    const accent = PHASE_COLOURS[pomodoro.phase];
+    const ww = 380;
+    const wh = 400;
+    const wx = 765 - ww / 2;
+    const wy = 160;
+    box(wx, wy, ww, wh, 11, 'rgba(30, 28, 38, 0.95)');
     g.save();
-    rounded(g, tx * k, ty * k, tw * k, th * k, 11 * k);
+    rounded(g, wx * k, wy * k, ww * k, wh * k, 11 * k);
     g.clip();
-    g.fillStyle = 'rgba(56, 56, 60, 0.95)';
-    g.fillRect(tx * k, ty * k, tw * k, 30 * k);
+    g.fillStyle = '#2c2c2f';
+    g.fillRect(wx * k, wy * k, ww * k, 30 * k);
     g.restore();
-    lights(tx + 20, ty + 15);
-    text('guest — -zsh — 80×24', tx + tw / 2, ty + 20, '#dadadd', font(600, 12), 'center');
-    const prompt = (cmd) => [[`guest@${host}`, '#8be3a1'], [' ~ ', '#7fb6ff'], [`% ${cmd}`, '#e6e6e6']];
-    const say = (t) => [[t, '#e6e6e6']];
-    const lines = [
-      prompt('cat ~/welcome.txt'),
-      say('Welcome to my computer.'),
-      say(''),
-      say('Soon this is where you will run focus sessions (pomodoro) with your friends,'),
-      say('and play a few small games together on your breaks.'),
-      say(''),
-      say('For now the Terminal works: type help to see what it can do.'),
-      say(''),
-      prompt('▍'),
-    ];
-    g.font = font(400, 12.5, MONO);
-    g.textAlign = 'left';
-    lines.forEach((parts, i) => {
-      let lx = (tx + 14) * k;
-      for (const [t, col] of parts) {
-        g.fillStyle = col;
-        g.fillText(t, lx, (ty + 56 + i * 22) * k);
-        lx += g.measureText(t).width;
-      }
+    lights(wx + 20, wy + 15);
+    text('Pomodoro', 765, wy + 20, '#dadadd', font(600, 12), 'center');
+
+    // Phase tabs.
+    box(765 - 150, wy + 46, 300, 28, 9, 'rgba(255, 255, 255, 0.07)');
+    Object.entries(PHASES).forEach(([id, p], i) => {
+      const tx = 765 - 150 + 3 + i * 98;
+      if (id === pomodoro.phase) box(tx, wy + 49, 96, 22, 6, `${accent}29`);
+      text(p.label, tx + 48, wy + 64, id === pomodoro.phase ? accent : '#b4b2bd', font(500, 12), 'center');
     });
 
-    // Dock: the Terminal.
+    // Progress ring and time.
+    const cx = 765 * k;
+    const cy = (wy + 182) * k;
+    const r = 88 * k;
+    g.lineWidth = 7 * k;
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.stroke();
+    const share = 1 - left / pomodoro.total();
+    if (share > 0.002) {
+      g.strokeStyle = accent;
+      g.beginPath();
+      g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + share * Math.PI * 2);
+      g.stroke();
+    }
+    text(formatTime(left), 765, wy + 196, '#ffffff', font(400, 58, SERIF), 'center');
+    const state = pomodoro.running ? pomodoro.label : pomodoro.started ? 'Paused' : pomodoro.label;
+    text(state.toUpperCase(), 765, wy + 222, accent, font(600, 11.5), 'center');
+
+    // Focus sessions in this cycle.
+    const every = pomodoro.settings.longEvery;
+    for (let i = 0; i < every; i++) {
+      const dx = 765 + (i - (every - 1) / 2) * 15;
+      const done = i < pomodoro.done || pomodoro.phase === 'long';
+      g.fillStyle = done ? accent : 'rgba(255, 255, 255, 0.14)';
+      g.beginPath();
+      g.arc(dx * k, (wy + 300) * k, 4 * k, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    // Start / Pause button.
+    box(765 - 64, wy + 324, 128, 40, 20, accent);
+    text(pomodoro.running ? 'Pause' : pomodoro.started ? 'Resume' : 'Start', 765, wy + 349, '#1b1520', font(600, 15), 'center');
+
+    // Dock: Pomodoro, then the Terminal.
     const size = 52;
-    const dw = size + 14;
+    const dw = 2 * size + 5 + 14;
     const dx = 765 - dw / 2;
     const dy = 640 - 8 - (size + 12);
     box(dx, dy, dw, size + 12, 21, 'rgba(40, 32, 60, 0.45)');
-    const ix = dx + 7;
-    const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
-    grad.addColorStop(0, '#4a4a50');
-    grad.addColorStop(1, '#1c1c1f');
-    box(ix, dy + 6, size, size, 12, grad);
-    const cx = (ix + size / 2) * k;
-    const cy = (dy + 6 + size / 2) * k;
+    const tile = (ix, top, bottom) => {
+      const grad = g.createLinearGradient(0, (dy + 6) * k, 0, (dy + 6 + size) * k);
+      grad.addColorStop(0, top);
+      grad.addColorStop(1, bottom);
+      box(ix, dy + 6, size, size, 12, grad);
+      return [(ix + size / 2) * k, (dy + 6 + size / 2) * k];
+    };
     g.strokeStyle = '#ffffff';
     g.lineWidth = 3 * k;
     g.lineCap = 'round';
     g.lineJoin = 'round';
+    // Pomodoro: a stopwatch.
+    const [px, py] = tile(dx + 7, '#ffa477', '#c9452e');
     g.beginPath();
-    g.moveTo(cx - 12 * k, cy - 8 * k);
-    g.lineTo(cx - 4 * k, cy);
-    g.lineTo(cx - 12 * k, cy + 8 * k);
-    g.moveTo(cx - 1 * k, cy + 9 * k);
-    g.lineTo(cx + 12 * k, cy + 9 * k);
+    g.arc(px, py + 2 * k, 12 * k, 0, Math.PI * 2);
+    g.moveTo(px, py + 2 * k);
+    g.lineTo(px, py - 5 * k);
+    g.moveTo(px - 3 * k, py - 15 * k);
+    g.lineTo(px + 3 * k, py - 15 * k);
+    g.stroke();
+    // Terminal: a prompt.
+    const [qx, qy] = tile(dx + 7 + size + 5, '#4a4a50', '#1c1c1f');
+    g.beginPath();
+    g.moveTo(qx - 12 * k, qy - 8 * k);
+    g.lineTo(qx - 4 * k, qy);
+    g.lineTo(qx - 12 * k, qy + 8 * k);
+    g.moveTo(qx - 1 * k, qy + 9 * k);
+    g.lineTo(qx + 12 * k, qy + 9 * k);
     g.stroke();
   }
 
+  // What is on the screen right now; it is redrawn only when this changes (the clock's
+  // minute, or the timer's second, phase or state).
+  const key = () => {
+    const now = new Date();
+    return `${now.getHours()}:${now.getMinutes()}|${formatTime(pomodoro.remaining())}|${pomodoro.phase}|${pomodoro.running}|${pomodoro.done}`;
+  };
   draw();
   const texture = toTexture(c);
-  let minute = new Date().getMinutes();
+  let shown = key();
   return {
     texture,
-    // Redraws the clock when the minute changes.
     tick() {
-      const m = new Date().getMinutes();
-      if (m === minute) return;
-      minute = m;
+      const now = key();
+      if (now === shown) return;
+      shown = now;
       draw();
       texture.needsUpdate = true;
     },

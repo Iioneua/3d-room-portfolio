@@ -1,17 +1,18 @@
 import './computer.css';
 import { createFS, HOME } from './fs.js';
-import { seedFiles, DESKTOP, WELCOME } from './seed.js';
+import { seedFiles, DESKTOP } from './seed.js';
 import { createOS } from './os.js';
 import { createTerminal } from './terminal.js';
+import { createPomodoroApp } from './pomodoro-app.js';
 
-// The computer you enter through the monitor on the desk: a desktop with a Terminal
-// working on in-memory files. The pomodoro and the games will live here too.
+// The computer you enter through the monitor on the desk: a desktop with the Pomodoro
+// timer and a Terminal working on in-memory files. The games will live here too.
 
-export function createComputer({ profile, stations, onLeave }) {
+export function createComputer({ profile, stations, pomodoro, onUserStart, onLeave }) {
   const fs = createFS();
   seedFiles(fs);
 
-  const ctx = { fs, profile, stations, leave: onLeave };
+  const ctx = { fs, profile, stations, pomodoro, onUserStart, leave: onLeave };
   const os = createOS({ profile, onLeave, onHelp: () => openTerminal({ command: 'cat ~/welcome.txt' }) });
   ctx.os = os;
 
@@ -44,8 +45,11 @@ export function createComputer({ profile, stations, onLeave }) {
     return win;
   }
 
+  const timer = createPomodoroApp(ctx);
+  os.register(timer.app);
   os.register(terminal);
   os.setDesktopMenu(() => [
+    { label: 'Open Pomodoro', action: () => timer.open() },
     { label: 'Open Terminal Here', action: () => openTerminal({ cwd: DESKTOP }) },
     '-',
     { label: 'Step Back from the Computer', action: onLeave },
@@ -57,7 +61,7 @@ export function createComputer({ profile, stations, onLeave }) {
       os.show();
       if (!first) return;
       first = false;
-      setTimeout(() => openTerminal({ command: `cat ${WELCOME.replace(HOME, '~')}` }), 350);
+      setTimeout(() => timer.open(), 350);
     },
     hide: () => os.hide(),
     // The desktop's own size and the scale it is shown at when the camera is still.

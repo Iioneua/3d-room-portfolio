@@ -516,7 +516,7 @@ function keyboard(parent, x, y, z) {
   return k;
 }
 
-function buildDesk(root, profile, noAO) {
+function buildDesk(root, pomodoro, noAO) {
   const g = group(root, CX, 0, BACK + 0.4);
   const black = M.paint('#19191b', 0.4);
   const alu = M.metal('#b9b8b6', 0.3);
@@ -535,7 +535,7 @@ function buildDesk(root, profile, noAO) {
   rbox(mon, 0.06, SCREEN.lift, 0.025, black, 0, SCREEN.lift / 2 + 0.01, -0.1, 0.006);
   const head = group(mon, 0, SCREEN.lift, 0);
   rbox(head, SCREEN.w + 0.03, SCREEN.h + 0.03, 0.03, M.paint('#1c1c1f', 0.45), 0, 0, -0.016, 0.006);
-  const desktop = tex.desktopScreen(profile);
+  const desktop = tex.desktopScreen(pomodoro);
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), displayMaterial(desktop.texture, 1.5));
   head.add(screen);
   rbox(head, 0.08, 0.1, 0.05, black, 0, 0, -0.05, 0.01);
@@ -831,7 +831,7 @@ function buildHitboxes(root) {
 }
 
 // The monitor's screen (centre and size, in metres), where the working desktop is
-// placed, and where the "Go into the computer" button floats, just under the monitor.
+// placed, and where the green button that goes into the computer floats, just under the monitor.
 export const screen = {
   center: v3(CX, DESK_TOP + SCREEN.lift, BACK + 0.2),
   width: SCREEN.w,
@@ -840,7 +840,7 @@ export const screen = {
 };
 
 // Where you stand and what you look at for each place, and where its marker floats
-// (the desk has none: the "Go into the computer" button stands in for it).
+// (the desk has none: the green button under the monitor stands in for it).
 export const home = {
   pos: v3(0, 1.6, 0.6),
   target: v3(0.15, 1.38, BACK),
@@ -868,7 +868,7 @@ export const views = {
   },
 };
 
-export function buildRoom(scene, assets, profile) {
+export function buildRoom(scene, assets, profile, pomodoro) {
   A = assets;
   M = createMaterials(assets);
   LIGHTS = scene;
@@ -879,7 +879,7 @@ export function buildRoom(scene, assets, profile) {
   buildShell(root);
   buildWindow(root, noAO);
   buildSlatWall(root, noAO);
-  const desktop = buildDesk(root, profile, noAO);
+  const desktop = buildDesk(root, pomodoro, noAO);
   buildPlaque(root, profile);
   buildRightSide(root);
   buildLeftSide(root);

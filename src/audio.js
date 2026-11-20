@@ -157,3 +157,52 @@ export function createAmbience() {
     },
   };
 }
+
+// A soft two-note bell for the end of a pomodoro phase: rising when a break starts,
+// falling when it is time to focus again. It has its own output, so turning the
+// ambient sound off does not silence it (the timer's settings can).
+export function createChime() {
+  let ctx = null;
+
+  // Browsers only allow sound after a click, so this is called from one (Start).
+  function prime() {
+    if (ctx) {
+      ctx.resume();
+      return;
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) ctx = new AudioCtx();
+  }
+
+  function bell(freq, time, volume) {
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, time);
+    out.gain.exponentialRampToValueAtTime(volume, time + 0.012);
+    out.gain.exponentialRampToValueAtTime(0.0001, time + 2.2);
+    out.connect(ctx.destination);
+    // A bell is a few partials that fade at different speeds.
+    for (const [ratio, level] of [[1, 1], [2.76, 0.22], [5.4, 0.08]]) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq * ratio;
+      gain.gain.setValueAtTime(level, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 2.2 / ratio);
+      osc.connect(gain).connect(out);
+      osc.start(time);
+      osc.stop(time + 2.3);
+    }
+  }
+
+  return {
+    prime,
+    play(toBreak) {
+      if (!ctx) return;
+      ctx.resume();
+      const t = ctx.currentTime + 0.05;
+      const [a, b] = toBreak ? [659.25, 987.77] : [987.77, 659.25];
+      bell(a, t, 0.22);
+      bell(b, t + 0.32, 0.2);
+    },
+  };
+}

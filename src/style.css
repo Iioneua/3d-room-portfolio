@@ -448,7 +448,7 @@ body:not(.intro) #intro {
   color: var(--faint);
 }
 
-/* "Go into the computer", floating under the monitor */
+/* The green button floating under the monitor: it goes into the computer and shows the timer */
 #computer-pill {
   position: fixed;
   top: 0;

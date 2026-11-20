@@ -4,15 +4,19 @@ import { HOME, join } from './fs.js';
 
 export const DESKTOP = `${HOME}/Desktop`;
 const DOCUMENTS =`${HOME}/Documents`;
-export const WELCOME = join(HOME, 'welcome.txt');
+const WELCOME = join(HOME, 'welcome.txt');
 
 const WELCOME_TEXT = `Welcome to my computer.
 
-Soon this is where you will run focus sessions (pomodoro) with your friends,
+The Pomodoro app in the dock is a focus timer: focus for a while, take a short
+break, and a longer one after a few rounds. It keeps running when you step back
+from the computer, and a chime tells you when it is time to switch.
+
+Soon you will be able to share a session with your friends through a link,
 and play a few small games together on your breaks.
 
-For now the Terminal works: type help to see what it can do.
-Your changes stay in this browser tab and are gone when you reload the page.
+The Terminal works too: type help to see what it can do. Files you make here
+stay in this browser tab and are gone when you reload the page.
 
 To step back from the computer, click Step back in the top bar,
 or click anywhere in the room around the screen.
